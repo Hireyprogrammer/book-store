@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="default_web_client_id" translatable="false">
+        <item>placeholder-client-id</item>
+    </string-array>
+</resources>

@@ -1,0 +1,76 @@
+{
+  "postBookRequests": [
+    {
+      "name": "Create Book - Complete Details",
+      "method": "POST",
+      "endpoint": "/books",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer YOUR_ADMIN_TOKEN"
+      },
+      "body": {
+        "title": "The Digital Renaissance",
+        "author": "Alex Technovation",
+        "isbn": "978-1234567890",
+        "description": "A comprehensive exploration of digital transformation in the modern era",
+        "price": 29.99,
+        "priceType": "Paid",
+        "genre": "Non-Fiction, Technology",
+        "accessType": "Digital",
+        "downloadLink": "https://example.com/book-download",
+        "bookDetails": {
+          "publisher": "Tech Insights Press",
+          "publicationYear": 2024
+        },
+        "images": [
+          "https://example.com/book-cover.jpg"
+        ],
+        "format": "PDF, EPUB",
+        "pageCount": 350,
+        "stockInfo": {
+          "quantity": 500,
+          "status": "In Stock"
+        },
+        "tags": ["technology", "digital transformation", "innovation"]
+      }
+    },
+    {
+      "name": "Create Book - Minimal Details",
+      "method": "POST", 
+      "endpoint": "/books",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer YOUR_ADMIN_TOKEN"
+      },
+      "body": {
+        "title": "Minimalist Programming",
+        "author": "Code Simplifier",
+        "isbn": "978-0987654321",
+        "price": 19.99,
+        "priceType": "Paid"
+      }
+    },
+    {
+      "name": "Create Free Book",
+      "method": "POST",
+      "endpoint": "/books", 
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer YOUR_ADMIN_TOKEN"
+      },
+      "body": {
+        "title": "Open Source Basics",
+        "author": "Community Contributor",
+        "isbn": "978-5432167890",
+        "price": 0,
+        "priceType": "Free",
+        "accessType": "Open"
+      }
+    }
+  ],
+  "notes": [
+    "Replace 'YOUR_ADMIN_TOKEN' with a valid JWT token",
+    "Ensure you have admin privileges to create books",
+    "Test different scenarios: complete details, minimal details, free book"
+  ]
+}
