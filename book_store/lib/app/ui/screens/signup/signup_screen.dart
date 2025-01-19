@@ -30,8 +30,9 @@ class SignupScreen extends GetView<SignupController> {
                   'Create Account',
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
+                    fontSize: 28,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.2,
                   ),
                 ),
                 const SizedBox(height: 40),
@@ -49,23 +50,42 @@ class SignupScreen extends GetView<SignupController> {
                       const Text(
                         'Username',
                         style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.black54,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF1565C0),
                         ),
                       ),
                       const SizedBox(height: 8),
                       TextField(
                         controller: controller.nameController,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          color: Color(0xFF2C3E50),
+                          fontWeight: FontWeight.w500,
+                        ),
                         decoration: InputDecoration(
                           hintText: 'Enter your username',
-                          prefixIcon: const Icon(Icons.person_outline, color: Colors.black54),
+                          hintStyle: TextStyle(
+                            color: Colors.grey[400],
+                            fontSize: 15,
+                            fontWeight: FontWeight.w400,
+                          ),
+                          prefixIcon: const Icon(Icons.person_outline, color: Color(0xFF1565C0)),
                           filled: true,
-                          fillColor: Colors.grey[100],
+                          fillColor: Colors.grey[50],
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide.none,
+                            borderSide: const BorderSide(color: Color(0xFF1565C0), width: 1),
                           ),
-                          hintStyle: const TextStyle(color: Colors.black38),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: Colors.grey[300]!, width: 1),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: Color(0xFF1565C0), width: 2),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                         ),
                       ),
                       const SizedBox(height: 20),
@@ -74,23 +94,42 @@ class SignupScreen extends GetView<SignupController> {
                       const Text(
                         'Email',
                         style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.black54,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF1565C0),
                         ),
                       ),
                       const SizedBox(height: 8),
                       TextField(
                         controller: controller.emailController,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          color: Color(0xFF2C3E50),
+                          fontWeight: FontWeight.w500,
+                        ),
                         decoration: InputDecoration(
                           hintText: 'Enter your email',
-                          prefixIcon: const Icon(Icons.email_outlined, color: Colors.black54),
+                          hintStyle: TextStyle(
+                            color: Colors.grey[400],
+                            fontSize: 15,
+                            fontWeight: FontWeight.w400,
+                          ),
+                          prefixIcon: const Icon(Icons.email_outlined, color: Color(0xFF1565C0)),
                           filled: true,
-                          fillColor: Colors.grey[100],
+                          fillColor: Colors.grey[50],
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide.none,
+                            borderSide: const BorderSide(color: Color(0xFF1565C0), width: 1),
                           ),
-                          hintStyle: const TextStyle(color: Colors.black38),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: Colors.grey[300]!, width: 1),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: Color(0xFF1565C0), width: 2),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                         ),
                       ),
                       const SizedBox(height: 20),
@@ -99,33 +138,52 @@ class SignupScreen extends GetView<SignupController> {
                       const Text(
                         'Password',
                         style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.black54,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF1565C0),
                         ),
                       ),
                       const SizedBox(height: 8),
                       Obx(() => TextField(
                         controller: controller.passwordController,
                         obscureText: !controller.isPasswordVisible.value,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          color: Color(0xFF2C3E50),
+                          fontWeight: FontWeight.w500,
+                        ),
                         decoration: InputDecoration(
                           hintText: 'Enter your password',
-                          prefixIcon: const Icon(Icons.lock_outline, color: Colors.black54),
+                          hintStyle: TextStyle(
+                            color: Colors.grey[400],
+                            fontSize: 15,
+                            fontWeight: FontWeight.w400,
+                          ),
+                          prefixIcon: const Icon(Icons.lock_outline, color: Color(0xFF1565C0)),
                           suffixIcon: IconButton(
                             icon: Icon(
                               controller.isPasswordVisible.value
                                   ? Icons.visibility_off
                                   : Icons.visibility,
-                              color: Colors.black54,
+                              color: const Color(0xFF1565C0),
                             ),
                             onPressed: controller.togglePasswordVisibility,
                           ),
                           filled: true,
-                          fillColor: Colors.grey[100],
+                          fillColor: Colors.grey[50],
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide.none,
+                            borderSide: const BorderSide(color: Color(0xFF1565C0), width: 1),
                           ),
-                          hintStyle: const TextStyle(color: Colors.black38),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: Colors.grey[300]!, width: 1),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: Color(0xFF1565C0), width: 2),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                         ),
                       )),
                       
@@ -145,8 +203,10 @@ class SignupScreen extends GetView<SignupController> {
                           child: const Text(
                             'Create Account',
                             style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 1.2,
                             ),
                           ),
                         ),
@@ -159,15 +219,20 @@ class SignupScreen extends GetView<SignupController> {
                         children: [
                           const Text(
                             'Already have an account? ',
-                            style: TextStyle(color: Colors.black54),
+                            style: TextStyle(
+                              color: Color(0xFF424242),
+                              fontSize: 15,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
                           TextButton(
                             onPressed: () => Get.toNamed(AppRoutes.login),
                             child: const Text(
                               'Login',
                               style: TextStyle(
-                                color: Color(0xFF2196F3),
-                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF1565C0),
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
                               ),
                             ),
                           ),
