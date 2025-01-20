@@ -104,29 +104,31 @@ class SignupController extends GetxController {
   }
 
   Future<void> signUp() async {
-    isLoading.value = true;
-    nameError.value = '';
-    emailError.value = '';
-    passwordError.value = '';
-    confirmPasswordError.value = '';
+    try {
+      // Show loading state
+      isLoading.value = true;
 
-    if (nameController.text.isEmpty) {
-      nameError.value = 'Name is required';
-    }
-    if (emailController.text.isEmpty) {
-      emailError.value = 'Email is required';
-    }
-    if (passwordController.text.isEmpty) {
-      passwordError.value = 'Password is required';
-    }
-    if (confirmPasswordController.text.isEmpty) {
-      confirmPasswordError.value = 'Confirm password is required';
-    }
-    if (passwordController.text != confirmPasswordController.text) {
-      confirmPasswordError.value = 'Passwords do not match';
-    }
+      // Reset error messages
+      nameError.value = '';
+      emailError.value = '';
+      passwordError.value = '';
+      confirmPasswordError.value = '';
 
-    if (nameError.value.isEmpty && emailError.value.isEmpty && passwordError.value.isEmpty && confirmPasswordError.value.isEmpty) {
+      // Validate all fields
+      validateName(nameController.text);
+      validateEmail(emailController.text);
+      validatePassword(passwordController.text);
+      validateConfirmPassword(confirmPasswordController.text);
+
+      // Check if there are any validation errors
+      if (nameError.value.isNotEmpty || 
+          emailError.value.isNotEmpty || 
+          passwordError.value.isNotEmpty || 
+          confirmPasswordError.value.isNotEmpty) {
+        return;
+      }
+
+      // Make API call to register
       final response = await _apiService.register(
         name: nameController.text,
         email: emailController.text,
@@ -134,14 +136,79 @@ class SignupController extends GetxController {
       );
 
       if (response['success']) {
-        // Navigate to the OTP verification screen
-        Get.toNamed(Routes.OTP_VERIFICATION);
+        // Show success message
+        Get.snackbar(
+          'Success',
+          'Registration successful! Please check your email for verification.',
+          backgroundColor: Colors.green[100],
+          colorText: Colors.green[900],
+          snackPosition: SnackPosition.TOP,
+          duration: const Duration(seconds: 5),
+        );
+
+        // Navigate to verification screen
+        Get.toNamed(AppRoutes.verifyOtp, arguments: {
+          'email': emailController.text,
+          'isVerification': true,
+        });
       } else {
-        // Handle error message
-        emailError.value = response['message'];
+        // Handle specific error types
+        final errorType = response['error_type'] ?? 'unknown_error';
+        final errorMessage = response['message'] ?? 'Registration failed. Please try again.';
+
+        switch (errorType) {
+          case 'connection_error':
+            Get.snackbar(
+              'Connection Error',
+              errorMessage,
+              backgroundColor: Colors.red[100],
+              colorText: Colors.red[900],
+              snackPosition: SnackPosition.TOP,
+              duration: const Duration(seconds: 5),
+              icon: const Icon(Icons.wifi_off, color: Colors.red),
+            );
+            break;
+          case 'timeout_error':
+            Get.snackbar(
+              'Server Timeout',
+              errorMessage,
+              backgroundColor: Colors.orange[100],
+              colorText: Colors.orange[900],
+              snackPosition: SnackPosition.TOP,
+              duration: const Duration(seconds: 5),
+              icon: const Icon(Icons.timer_off, color: Colors.orange),
+            );
+            break;
+          default:
+            // Check for specific field errors
+            if (errorMessage.toLowerCase().contains('email')) {
+              emailError.value = errorMessage;
+            } else if (errorMessage.toLowerCase().contains('username')) {
+              nameError.value = errorMessage;
+            } else {
+              Get.snackbar(
+                'Registration Error',
+                errorMessage,
+                backgroundColor: Colors.red[100],
+                colorText: Colors.red[900],
+                snackPosition: SnackPosition.TOP,
+                duration: const Duration(seconds: 5),
+              );
+            }
+        }
       }
+    } catch (e) {
+      Get.snackbar(
+        'Error',
+        'An unexpected error occurred. Please try again.',
+        backgroundColor: Colors.red[100],
+        colorText: Colors.red[900],
+        snackPosition: SnackPosition.TOP,
+        duration: const Duration(seconds: 5),
+      );
+    } finally {
+      isLoading.value = false;
     }
-    isLoading.value = false;
   }
 
   void navigateToLogin() {

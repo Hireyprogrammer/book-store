@@ -5,6 +5,8 @@ import '../ui/screens/signup/signup_screen.dart';
 import '../ui/screens/home/home_screen.dart';
 import '../ui/screens/book_details/book_details_screen.dart';
 import '../ui/screens/forgot_password/forgot_password_screen.dart';
+import '../ui/screens/otp_verification/verify_otp_screen.dart';
+import '../controllers/verify_otp_controller.dart';
 import '../bindings/splash_binding.dart';
 import '../bindings/login_binding.dart';
 import '../bindings/signup_binding.dart';
@@ -22,6 +24,7 @@ class AppRoutes {
   static const String home = '/home';
   static const String bookDetails = '/book_details';
   static const String forgotPassword = '/forgot_password';
+  static const String verifyOtp = '/verify_otp';
 }
 
 class AppPages {
@@ -69,6 +72,15 @@ class AppPages {
       name: AppRoutes.forgotPassword,
       page: () => const ForgotPasswordScreen(),
       binding: ForgotPasswordBinding(),
+      transition: Transition.rightToLeftWithFade,
+      transitionDuration: const Duration(milliseconds: 500),
+    ),
+    GetPage(
+      name: AppRoutes.verifyOtp,
+      page: () => const VerifyOtpScreen(),
+      binding: BindingsBuilder(() {
+        Get.lazyPut<VerifyOtpController>(() => VerifyOtpController(), fenix: true);
+      }),
       transition: Transition.rightToLeftWithFade,
       transitionDuration: const Duration(milliseconds: 500),
     ),

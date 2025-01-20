@@ -1,90 +1,164 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import '../services/api_service.dart';
-import '../utils/connection_diagnostic.dart';
-import '../config/app_config.dart';
+import 'package:pin_code_fields/pin_code_fields.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../routes/app_pages.dart';
+import '../services/api_service.dart';
 
 class AuthController extends GetxController {
-  static AuthController get to => Get.find();
-
   final ApiService _apiService = ApiService.to;
-
+  
+  // Loading and Error States
   final RxBool isLoading = false.obs;
-  final RxBool isLoggedIn = false.obs;
-  final RxBool isPasswordVisible = false.obs;
-  final RxBool isServerConnected = false.obs;
-  final RxBool isInternetAvailable = false.obs;
+  final RxString errorMessage = ''.obs;
+  
+  // Authentication States
+  final RxBool isAuthenticated = false.obs;
   final Rx<String?> token = Rx<String?>(null);
   final Rx<Map<String, dynamic>?> userData = Rx<Map<String, dynamic>?>(null);
-  final Rx<Map<String, dynamic>?> connectionReport = Rx<Map<String, dynamic>?>(null);
+
+  // OTP Verification States
+  final otpController = TextEditingController();
+  final errorController = StreamController<ErrorAnimationType>.broadcast();
+  final RxString currentText = ''.obs;
+  final RxBool canResendCode = true.obs;
+  final RxInt resendTimer = 60.obs;
+  Timer? _resendTimer;
 
   @override
   void onInit() {
     super.onInit();
-    _checkInitialAuthStatus();
-    _performConnectionDiagnostics();
-    ever(isLoggedIn, _setInitialScreen);
+    checkAuthStatus();
   }
 
-  Future<void> _performConnectionDiagnostics() async {
+  void startResendTimer() {
+    canResendCode.value = false;
+    resendTimer.value = 60;
+    _resendTimer?.cancel(); // Cancel existing timer if any
+    _resendTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (resendTimer.value > 0) {
+        resendTimer.value--;
+      } else {
+        canResendCode.value = true;
+        timer.cancel();
+      }
+    });
+  }
+
+  Future<void> verifyOtp({required String email, required String otp}) async {
     try {
+      if (isLoading.value) return;
+      
       isLoading.value = true;
+      errorMessage.value = '';
       
-      // Check internet connectivity
-      isInternetAvailable.value = await ConnectionDiagnostic.checkInternetConnection();
-      
-      // Validate server URL
-      final isValidUrl = ConnectionDiagnostic.validateServerUrl(AppConfig.baseUrl);
-      
-      // Perform server health check
-      final healthCheckResult = await _apiService.checkServerHealth();
-      isServerConnected.value = healthCheckResult['success'] ?? false;
-
-      // Generate comprehensive connection report
-      connectionReport.value = {
-        'internetAvailable': isInternetAvailable.value,
-        'serverConnected': isServerConnected.value,
-        'validServerUrl': isValidUrl,
-        'serverDetails': healthCheckResult,
-        'timestamp': DateTime.now().toIso8601String(),
-      };
-
-      // Log connection diagnostics
-      if (!isInternetAvailable.value || !isServerConnected.value) {
+      // Validate OTP format
+      if (otp.length != 6 || !RegExp(r'^\d{6}$').hasMatch(otp)) {
+        errorController.add(ErrorAnimationType.shake);
+        errorMessage.value = 'Please enter a valid 6-digit code';
         Get.snackbar(
-          'Connection Issue',
-          'Please check your internet and server connection',
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.orange,
-          colorText: Colors.white,
+          'Invalid Code',
+          errorMessage.value,
+          backgroundColor: Colors.red[100],
+          colorText: Colors.red[900],
+          duration: const Duration(seconds: 3),
         );
+        return;
+      }
+      
+      final response = await _apiService.verifyOtp(email: email, otp: otp);
+      
+      if (response['success']) {
+        // Clear OTP input
+        otpController.clear();
+        currentText.value = '';
+        
+        Get.snackbar(
+          'Success',
+          'Email verified successfully',
+          backgroundColor: Colors.green[100],
+          colorText: Colors.green[900],
+          duration: const Duration(seconds: 2),
+        );
+        
+        // Update auth status and navigate
+        await checkAuthStatus();
+        Get.offAllNamed(AppRoutes.home);
+      } else {
+        errorController.add(ErrorAnimationType.shake);
+        errorMessage.value = response['message'] ?? 'Invalid verification code';
+        Get.snackbar(
+          'Verification Failed',
+          errorMessage.value,
+          backgroundColor: Colors.red[100],
+          colorText: Colors.red[900],
+          duration: const Duration(seconds: 3),
+        );
+        
+        // Clear OTP input on error
+        otpController.clear();
+        currentText.value = '';
       }
     } catch (e) {
+      errorController.add(ErrorAnimationType.shake);
+      errorMessage.value = 'Failed to verify code. Please try again.';
       Get.snackbar(
-        'Diagnostic Error',
-        'Failed to perform connection diagnostics',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
+        'Error',
+        errorMessage.value,
+        backgroundColor: Colors.red[100],
+        colorText: Colors.red[900],
+        duration: const Duration(seconds: 3),
       );
+      
+      // Clear OTP input on error
+      otpController.clear();
+      currentText.value = '';
     } finally {
       isLoading.value = false;
     }
   }
 
-  Future<void> _checkInitialAuthStatus() async {
-    final prefs = await SharedPreferences.getInstance();
-    final storedToken = prefs.getString('auth_token');
-    
-    if (storedToken != null) {
-      token.value = storedToken;
-      isLoggedIn.value = true;
+  Future<void> resendVerificationCode(String email) async {
+    try {
+      if (isLoading.value || !canResendCode.value) return;
+      
+      isLoading.value = true;
+      errorMessage.value = '';
+      
+      final response = await _apiService.resendVerification(email: email);
+      
+      if (response['success']) {
+        Get.snackbar(
+          'Success',
+          'Verification code sent successfully',
+          backgroundColor: Colors.green[100],
+          colorText: Colors.green[900],
+          duration: const Duration(seconds: 2),
+        );
+        startResendTimer();
+      } else {
+        errorMessage.value = response['message'] ?? 'Failed to send verification code';
+        Get.snackbar(
+          'Error',
+          errorMessage.value,
+          backgroundColor: Colors.red[100],
+          colorText: Colors.red[900],
+          duration: const Duration(seconds: 3),
+        );
+      }
+    } catch (e) {
+      errorMessage.value = 'Failed to send verification code. Please try again.';
+      Get.snackbar(
+        'Error',
+        errorMessage.value,
+        backgroundColor: Colors.red[100],
+        colorText: Colors.red[900],
+        duration: const Duration(seconds: 3),
+      );
+    } finally {
+      isLoading.value = false;
     }
-  }
-
-  void togglePasswordVisibility() {
-    isPasswordVisible.value = !isPasswordVisible.value;
   }
 
   Future<void> register({
@@ -100,26 +174,33 @@ class AuthController extends GetxController {
         password: password,
       );
 
-      if (response['success']) {
-        // Handle successful registration
+      if (response['success'] == true) {
+        // Store email for OTP verification
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('pending_verification_email', email);
+        
         Get.snackbar(
           'Success',
-          'Account created successfully',
+          'Account created successfully. Please verify your email.',
           snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.green,
-          colorText: Colors.white,
+          backgroundColor: Colors.green[100],
+          colorText: Colors.green[900],
+          duration: const Duration(seconds: 3),
         );
         
-        // Automatically log in after registration
-        await login(email: email, password: password);
+        // Navigate to OTP verification screen
+        Get.toNamed(
+          AppRoutes.verifyOtp,
+          arguments: {'email': email}
+        );
       } else {
-        // Handle registration failure
         Get.snackbar(
           'Error',
-          response['message'] ?? 'Registration failed',
+          response['message']?.toString() ?? 'Registration failed',
           snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.red,
-          colorText: Colors.white,
+          backgroundColor: Colors.red[100],
+          colorText: Colors.red[900],
+          duration: const Duration(seconds: 3),
         );
       }
     } catch (e) {
@@ -127,8 +208,9 @@ class AuthController extends GetxController {
         'Error',
         'An unexpected error occurred',
         snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
+        backgroundColor: Colors.red[100],
+        colorText: Colors.red[900],
+        duration: const Duration(seconds: 3),
       );
     } finally {
       isLoading.value = false;
@@ -149,7 +231,7 @@ class AuthController extends GetxController {
       if (response['success']) {
         // Update authentication state
         token.value = response['token'];
-        isLoggedIn.value = true;
+        isAuthenticated.value = true;
         userData.value = response['data'];
 
         // Navigate to home screen
@@ -188,56 +270,66 @@ class AuthController extends GetxController {
   Future<void> logout() async {
     try {
       isLoading.value = true;
-      final response = await _apiService.logout();
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('auth_token');
+      token.value = null;
+      isAuthenticated.value = false;
+      userData.value = null;
 
-      if (response['success']) {
-        // Clear authentication state
-        token.value = null;
-        isLoggedIn.value = false;
-        userData.value = null;
+      // Navigate to login screen
+      Get.offAllNamed('/login');
 
-        // Navigate to login screen
-        Get.offAllNamed('/login');
-
-        Get.snackbar(
-          'Success',
-          'Logged out successfully',
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.green,
-          colorText: Colors.white,
-        );
-      } else {
-        Get.snackbar(
-          'Error',
-          response['message'] ?? 'Logout failed',
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.red,
-          colorText: Colors.white,
-        );
-      }
+      Get.snackbar(
+        'Success',
+        'Logged out successfully',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+      );
     } catch (e) {
       Get.snackbar(
         'Error',
-        'An unexpected error occurred',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
+        'Failed to logout. Please try again.',
+        backgroundColor: Colors.red[100],
+        colorText: Colors.red[900],
+        snackPosition: SnackPosition.TOP,
       );
     } finally {
       isLoading.value = false;
     }
   }
 
+  void togglePasswordVisibility() {
+    // isPasswordVisible.value = !isPasswordVisible.value;
+  }
+
   void _setInitialScreen(bool isLoggedIn) {
-    if (isLoggedIn && isServerConnected.value) {
+    if (isLoggedIn) {
       Get.offAllNamed('/home');
     } else {
       Get.offAllNamed('/login');
     }
   }
 
-  // Optional: Manual connection recheck
-  Future<void> recheckConnection() async {
-    await _performConnectionDiagnostics();
+  Future<void> checkAuthStatus() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final storedToken = prefs.getString('auth_token');
+      
+      if (storedToken != null) {
+        token.value = storedToken;
+        isAuthenticated.value = true;
+      }
+    } catch (e) {
+      isAuthenticated.value = false;
+    }
+  }
+
+  @override
+  void onClose() {
+    otpController.dispose();
+    errorController.close();
+    _resendTimer?.cancel();
+    super.onClose();
   }
 }

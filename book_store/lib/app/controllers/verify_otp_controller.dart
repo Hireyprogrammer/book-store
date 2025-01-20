@@ -18,8 +18,15 @@ class VerifyOtpController extends GetxController {
       final response = await _apiService.verifyOtp(email: email, otp: otp);
 
       if (response['success']) {
-        // Navigate to the next screen after successful verification
-        Get.offAllNamed(Routes.HOME);
+        Get.snackbar(
+          'Success',
+          'Email verified successfully!',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.green[100],
+          colorText: Colors.green[900],
+        );
+        // Navigate to the home screen after successful verification
+        Get.offAllNamed(AppRoutes.home);
       } else {
         // Show error message to user
         errorMessage.value = response['message'] ?? 'Verification failed';
@@ -46,6 +53,8 @@ class VerifyOtpController extends GetxController {
   }
 
   Future<void> resendOtp(String email) async {
+    if (isLoading.value) return; // Prevent multiple requests
+    
     isLoading.value = true;
     errorMessage.value = '';
     

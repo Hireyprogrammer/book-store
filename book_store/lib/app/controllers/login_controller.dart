@@ -4,136 +4,134 @@ import '../services/api_service.dart';
 import '../routes/app_pages.dart';
 
 class LoginController extends GetxController {
+  final emailController = TextEditingController();
+  final passwordController = TextEditingController();
   final ApiService _apiService = ApiService.to;
-
-  // Text Controllers
-  final TextEditingController emailController = TextEditingController();
-  final TextEditingController passwordController = TextEditingController();
-
-  // Observables for form state and validation
-  final RxBool isPasswordVisible = false.obs;
-  final RxString emailError = RxString('');
-  final RxString passwordError = RxString('');
-  final RxBool isLoading = false.obs;
   
-  // Computed observable for login button state
-  RxBool get isLoginValid => 
-    RxBool(emailError.value.isEmpty && 
-           passwordError.value.isEmpty && 
-           emailController.text.isNotEmpty && 
-           passwordController.text.isNotEmpty);
+  final RxBool isLoading = false.obs;
+  final RxString emailError = ''.obs;
+  final RxString passwordError = ''.obs;
+  final RxBool isPasswordVisible = false.obs;
+  final RxBool hasConnectionError = false.obs;
 
-  @override
-  void onClose() {
-    emailController.dispose();
-    passwordController.dispose();
-    super.onClose();
-  }
-
-  void togglePasswordVisibility() {
-    isPasswordVisible.value = !isPasswordVisible.value;
-  }
-
-  void validateEmail(String? email) {
-    if (email == null || email.isEmpty) {
+  void validateEmail(String value) {
+    if (value.isEmpty) {
       emailError.value = 'Email is required';
-    } else if (!GetUtils.isEmail(email)) {
-      emailError.value = 'Invalid email format';
+    } else if (!GetUtils.isEmail(value)) {
+      emailError.value = 'Please enter a valid email';
     } else {
       emailError.value = '';
     }
   }
 
-  void validatePassword(String? password) {
-    if (password == null || password.isEmpty) {
+  void validatePassword(String value) {
+    if (value.isEmpty) {
       passwordError.value = 'Password is required';
-    } else if (password.length < 6) {
+    } else if (value.length < 6) {
       passwordError.value = 'Password must be at least 6 characters';
     } else {
       passwordError.value = '';
     }
   }
 
+  void togglePasswordVisibility() {
+    isPasswordVisible.value = !isPasswordVisible.value;
+  }
+
+  void retryConnection() {
+    hasConnectionError.value = false;
+    login();
+  }
+
   Future<void> login() async {
     try {
-      // Validate inputs first
-      if (!isLoginValid.value) {
-        Get.snackbar(
-          'Login Error', 
-          'Please check your email and password',
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.red,
-          colorText: Colors.white,
-        );
-        return;
-      }
-
+      // Show loading state
       isLoading.value = true;
 
-      // Perform server health check first
-      final healthCheck = await ApiService.to.checkServerHealth();
-      if (!healthCheck['success']) {
-        Get.snackbar(
-          'Server Unavailable', 
-          healthCheck['message'] ?? 'Could not connect to server',
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.red,
-          colorText: Colors.white,
-          duration: const Duration(seconds: 5),
-        );
-        isLoading.value = false;
+      // Reset error messages
+      emailError.value = '';
+      passwordError.value = '';
+
+      // Validate fields
+      validateEmail(emailController.text);
+      validatePassword(passwordController.text);
+
+      // Check if there are any validation errors
+      if (emailError.value.isNotEmpty || passwordError.value.isNotEmpty) {
         return;
       }
 
-      // Proceed with login
-      final response = await ApiService.to.login(
-        email: emailController.text.trim(), 
-        password: passwordController.text.trim()
+      // Make API call to login
+      final response = await _apiService.login(
+        email: emailController.text,
+        password: passwordController.text,
       );
 
-      isLoading.value = false;
+      if (response['success']) {
+        // Show success message
+        Get.snackbar(
+          'Success',
+          'Login successful!',
+          backgroundColor: Colors.green[100],
+          colorText: Colors.green[900],
+          snackPosition: SnackPosition.TOP,
+          duration: const Duration(seconds: 3),
+        );
 
-      if (response['success'] == true) {
-        // Successful login
+        // Navigate to home screen
         Get.offAllNamed(AppRoutes.home);
       } else {
-        // Login failed
-        Get.snackbar(
-          'Login Failed',
-          response['message'] ?? 'Invalid email or password',
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.red,
-          colorText: Colors.white,
-        );
+        final errorMessage = response['message'] ?? 'Login failed';
+        
+        // Check for specific error types
+        if (response['error_type'] == 'connection_error') {
+          hasConnectionError.value = true;
+          Get.snackbar(
+            'Connection Error',
+            'Unable to connect to server. Please check your internet connection.',
+            backgroundColor: Colors.orange[100],
+            colorText: Colors.orange[900],
+            snackPosition: SnackPosition.BOTTOM,
+            duration: const Duration(seconds: 5),
+            icon: const Icon(Icons.wifi_off, color: Colors.orange),
+            mainButton: TextButton(
+              onPressed: retryConnection,
+              child: const Text('Retry'),
+            ),
+          );
+        } else if (errorMessage.toLowerCase().contains('email')) {
+          emailError.value = errorMessage;
+        } else if (errorMessage.toLowerCase().contains('password')) {
+          passwordError.value = errorMessage;
+        } else {
+          Get.snackbar(
+            'Login Error',
+            errorMessage,
+            backgroundColor: Colors.red[100],
+            colorText: Colors.red[900],
+            snackPosition: SnackPosition.BOTTOM,
+            duration: const Duration(seconds: 5),
+          );
+        }
       }
     } catch (e) {
-      isLoading.value = false;
-      print('Login Error Details: $e');  // Detailed error logging
       Get.snackbar(
-        'Connection Error', 
-        'Unable to connect to the server. Please check your network and try again.',
+        'Error',
+        'An unexpected error occurred',
+        backgroundColor: Colors.red[100],
+        colorText: Colors.red[900],
         snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
         duration: const Duration(seconds: 5),
       );
+    } finally {
+      isLoading.value = false;
     }
   }
 
-  Future<void> _storeUserSession(Map<String, dynamic> response) async {
-    // TODO: Implement secure token storage using SharedPreferences or secure storage
-    // Example:
-    // await SharedPreferences.getInstance().then((prefs) {
-    //   prefs.setString('auth_token', response['token']);
-    //   prefs.setString('user_id', response['user_id']);
-    // });
-  }
-
-  void navigateToSignup() {
-    Get.toNamed(AppRoutes.signup);
-  }
-
-  void forgotPassword() {
-    Get.toNamed(AppRoutes.forgotPassword);
+  @override
+  void onClose() {
+    emailController.dispose();
+    passwordController.dispose();
+    super.onClose();
   }
 }

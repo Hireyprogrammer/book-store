@@ -1,6 +1,12 @@
 class AppConfig {
   // Backend Server Configuration
-  static const String baseUrl = 'http://localhost:5000';
+  static const String baseUrl = 'http://10.0.2.2:5000'; // Android emulator localhost
+  // static const String baseUrl = 'http://localhost:5000'; // For web or desktop
+  
+  // API Endpoints
+  static const String registerEndpoint = '/api/auth/register';
+  static const String loginEndpoint = '/api/auth/login';
+  static const String verifyEmailEndpoint = '/api/auth/verify-email';
   
   // Timeout Configurations
   static const int connectionTimeout = 30; // seconds

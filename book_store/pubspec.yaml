@@ -41,6 +41,7 @@ dependencies:
   flutter_animate: ^4.2.0
   http: ^1.1.2
   connectivity_plus: ^5.0.2
+  pin_code_fields: ^8.0.1
 
 dev_dependencies:
   flutter_test:
@@ -98,5 +99,3 @@ flutter:
   assets:
     - assets/icons/google_logo.png
     - assets/
-    - assets/images/
-    - assets/animations/

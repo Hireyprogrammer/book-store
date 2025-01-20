@@ -65,6 +65,15 @@ router.post('/register', validateRegistration, async (req, res) => {
 
     // Generate verification code
     const verificationCode = user.generateVerificationCode();
+    
+    // Debug logging
+    console.log('\n=== Registration Debug Info ===');
+    console.log('Generated verification details:', {
+      email: user.email,
+      verificationCode: verificationCode,
+      storedCode: user.verificationCode,
+      expiryTime: user.verificationCodeExpires
+    });
 
     // Save user
     await user.save();
@@ -211,6 +220,17 @@ router.post('/verify-email', [
         error: 'USER_NOT_FOUND'
       });
     }
+
+    console.log('\n=== Verification Debug Info ===');
+    console.log('User found:', {
+      email: user.email,
+      isEmailVerified: user.isEmailVerified,
+      hasVerificationCode: !!user.verificationCode,
+      verificationCode: user.verificationCode,
+      verificationCodeExpires: user.verificationCodeExpires,
+      currentTime: new Date(),
+      providedPin: pin
+    });
 
     console.log('Verification attempt:', {
       email,

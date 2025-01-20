@@ -1,5 +1,5 @@
-import 'dart:convert';
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:get/get.dart';
@@ -9,60 +9,74 @@ import '../config/app_config.dart';
 class ApiService extends GetxService {
   static ApiService get to => Get.find();
 
-  // Use configuration from AppConfig
-  static const String _baseUrl = AppConfig.baseUrl;
-  static const int _timeoutSeconds = AppConfig.connectionTimeout;
+  final String _baseUrl = AppConfig.baseUrl;
 
-  // Headers with dynamic token support
+  Map<String, String> get _defaultHeaders => {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+  };
+
   Future<Map<String, String>> get _headers async {
+    final headers = Map<String, String>.from(_defaultHeaders);
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
-    return {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      if (token != null) 'Authorization': 'Bearer $token',
-    };
+    if (token != null) {
+      headers['Authorization'] = 'Bearer $token';
+    }
+    return headers;
   }
 
-  // Response Handler
   Map<String, dynamic> _handleResponse(http.Response response) {
+    print('🔍 Processing response:');
+    print('📊 Status code: ${response.statusCode}');
+    print('📄 Response body: ${response.body}');
+    
     try {
       final data = jsonDecode(response.body);
-
       if (response.statusCode >= 200 && response.statusCode < 300) {
         return {
           'success': true,
-          'data': data,
-          'message': data['message'] ?? 'Operation successful',
-          'token': data['token'],
+          ...data,
         };
       } else {
         return {
           'success': false,
-          'message': data['message'] ?? 'Operation failed',
-          'error': data['error'] ?? 'Unknown error',
-          'statusCode': response.statusCode,
+          'message': data['message'] ?? 'An error occurred',
+          'error': data['error'],
         };
       }
     } catch (e) {
-      print('Response parsing error: $e'); // Debug log
+      print('❌ Error processing response: $e');
       return {
         'success': false,
-        'message': 'Failed to process server response',
+        'message': 'Failed to process response',
         'error': e.toString(),
       };
     }
   }
 
-  // Error Handler
   Map<String, dynamic> _handleError(dynamic error) {
-    print('API Error: $error'); // For debugging
+    print('❌ Handling error: $error');
+    if (error is SocketException) {
+      return {
+        'success': false,
+        'message': 'Unable to connect to server. Please check your internet connection.',
+        'error_type': 'connection_error',
+        'error': error.toString()
+      };
+    } else if (error is TimeoutException) {
+      return {
+        'success': false,
+        'message': 'Server is taking too long to respond. Please try again.',
+        'error_type': 'timeout_error',
+        'error': error.toString()
+      };
+    }
     return {
       'success': false,
-      'message': error is TimeoutException
-          ? 'Connection timeout. Please try again.'
-          : 'An error occurred: ${error.toString()}',
-      'error': error.toString(),
+      'message': 'An unexpected error occurred. Please try again.',
+      'error_type': 'unknown_error',
+      'error': error.toString()
     };
   }
 
@@ -72,16 +86,54 @@ class ApiService extends GetxService {
     required String email,
     required String password,
   }) async {
-    final response = await http.post(
-      Uri.parse('$_baseUrl/api/auth/register'),
-      headers: await _headers,
-      body: jsonEncode({
-        'name': name,
+    try {
+      print('📝 Starting registration process:');
+      print('🌐 Base URL: $_baseUrl');
+      print('📍 Endpoint: $_baseUrl${AppConfig.registerEndpoint}');
+      print('👤 Username: $name');
+      print('📧 Email: $email');
+      
+      final headers = await _headers;
+      print('📤 Request Headers: $headers');
+      
+      final requestBody = {
+        'username': name,
         'email': email,
         'password': password,
-      }),
-    );
-    return _handleResponse(response);
+        'role': 'user'
+      };
+      print('📦 Request Body: ${jsonEncode(requestBody)}');
+
+      final response = await http
+          .post(
+            Uri.parse('$_baseUrl${AppConfig.registerEndpoint}'),
+            headers: headers,
+            body: jsonEncode(requestBody),
+          )
+          .timeout(const Duration(seconds: AppConfig.connectionTimeout));
+
+      print('📥 Response Status Code: ${response.statusCode}');
+      print('📥 Response Headers: ${response.headers}');
+      print('📥 Response Body: ${response.body}');
+
+      final result = _handleResponse(response);
+      print('🔄 Processed Result: $result');
+
+      return result;
+    } on SocketException catch (e) {
+      print('❌ Socket Exception during registration: $e');
+      print('🔍 Error Details: ${e.message}');
+      print('🔌 Address: ${e.address}');
+      print('🔌 Port: ${e.port}');
+      return _handleError(e);
+    } on TimeoutException catch (e) {
+      print('⏰ Timeout Exception during registration: $e');
+      return _handleError(e);
+    } catch (e) {
+      print('❌ General Error during registration: $e');
+      print('🔍 Error Type: ${e.runtimeType}');
+      return _handleError(e);
+    }
   }
 
   // User Login
@@ -90,48 +142,51 @@ class ApiService extends GetxService {
     required String password,
   }) async {
     try {
-      print('🔐 Attempting login to: $_baseUrl/api/auth/login'); // Debug log
-      print('📧 Email: $email'); // Debug log
+      print('🔐 Attempting login with following details:');
+      print('🌐 Base URL: $_baseUrl');
+      print('📍 Endpoint: $_baseUrl/api/auth/login');
+      print('📧 Email: $email');
+      
+      final headers = await _headers;
+      print('📤 Request Headers: $headers');
 
       final response = await http
           .post(
             Uri.parse('$_baseUrl/api/auth/login'),
-            headers: await _headers,
+            headers: headers,
             body: jsonEncode({
               'email': email,
               'password': password,
             }),
           )
-          .timeout(Duration(seconds: _timeoutSeconds));
+          .timeout(const Duration(seconds: 10));
 
-      print('📥 Login response status: ${response.statusCode}'); // Debug log
-      print('📄 Login response body: ${response.body}'); // Debug log
+      print('📥 Response Status Code: ${response.statusCode}');
+      print('📥 Response Headers: ${response.headers}');
+      print('📥 Response Body: ${response.body}');
 
       final result = _handleResponse(response);
+      print('🔄 Processed Result: $result');
 
-      // Store token if login is successful
       if (result['success'] && result['token'] != null) {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('auth_token', result['token']);
+        print('✅ Token stored successfully');
       }
 
       return result;
+    } on SocketException catch (e) {
+      print('❌ Socket Exception: $e');
+      print('🔍 Error Details: ${e.message}');
+      print('🔌 Address: ${e.address}');
+      print('🔌 Port: ${e.port}');
+      return _handleError(e);
+    } on TimeoutException catch (e) {
+      print('⏰ Timeout Exception: $e');
+      return _handleError(e);
     } catch (e) {
-      print('❌ Login error: $e'); // Debug log
-      if (e is SocketException) {
-        return {
-          'success': false,
-          'message':
-              'Could not connect to server. Please check your internet connection.',
-          'error': e.toString()
-        };
-      } else if (e is TimeoutException) {
-        return {
-          'success': false,
-          'message': 'Server is taking too long to respond. Please try again.',
-          'error': e.toString()
-        };
-      }
+      print('❌ General Error: $e');
+      print('🔍 Error Type: ${e.runtimeType}');
       return _handleError(e);
     }
   }
@@ -142,16 +197,83 @@ class ApiService extends GetxService {
     required String otp,
   }) async {
     try {
-      final response = await http.post(
-        Uri.parse('$_baseUrl/api/verify-otp'),
-        headers: await _headers,
-        body: jsonEncode({
-          'email': email,
-          'otp': otp,
-        }),
-      );
+      print('🔐 Attempting OTP verification:');
+      print('🌐 Base URL: $_baseUrl');
+      print('📍 Endpoint: $_baseUrl${AppConfig.verifyEmailEndpoint}');
+      print('📧 Email: $email');
+      print('🔑 OTP: $otp');
+      
+      final headers = await _headers;
+      print('📤 Request Headers: $headers');
+      
+      final requestBody = {
+        'email': email,
+        'otp': otp,
+      };
+      print('📦 Request Body: ${jsonEncode(requestBody)}');
+
+      final response = await http
+          .post(
+            Uri.parse('$_baseUrl${AppConfig.verifyEmailEndpoint}'),
+            headers: headers,
+            body: jsonEncode(requestBody),
+          )
+          .timeout(const Duration(seconds: AppConfig.connectionTimeout));
+
+      print('📥 Response Status Code: ${response.statusCode}');
+      print('📥 Response Headers: ${response.headers}');
+      print('📥 Response Body: ${response.body}');
+
+      final result = _handleResponse(response);
+      print('🔄 Processed Result: $result');
+
+      if (result['success'] && result['token'] != null) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('auth_token', result['token']);
+        print('✅ Token stored successfully');
+      }
+
+      return result;
+    } on SocketException catch (e) {
+      print('❌ Socket Exception during OTP verification: $e');
+      print('🔍 Error Details: ${e.message}');
+      print('🔌 Address: ${e.address}');
+      print('🔌 Port: ${e.port}');
+      return _handleError(e);
+    } on TimeoutException catch (e) {
+      print('⏰ Timeout Exception during OTP verification: $e');
+      return _handleError(e);
+    } catch (e) {
+      print('❌ General Error during OTP verification: $e');
+      print('🔍 Error Type: ${e.runtimeType}');
+      return _handleError(e);
+    }
+  }
+
+  // Resend verification code
+  Future<Map<String, dynamic>> resendVerification({
+    required String email,
+  }) async {
+    try {
+      print('📨 Requesting new verification code: $_baseUrl/api/auth/resend-verification'); // Debug log
+      print('📧 Email: $email'); // Debug log
+
+      final response = await http
+          .post(
+            Uri.parse('$_baseUrl/api/auth/resend-verification'),
+            headers: await _headers,
+            body: jsonEncode({
+              'email': email,
+            }),
+          )
+          .timeout(Duration(seconds: 10));
+
+      print('📥 Resend verification response status: ${response.statusCode}'); // Debug log
+      print('📄 Resend verification response body: ${response.body}'); // Debug log
+
       return _handleResponse(response);
     } catch (e) {
+      print('❌ Resend verification error: $e'); // Debug log
       return _handleError(e);
     }
   }
@@ -162,20 +284,6 @@ class ApiService extends GetxService {
   }) async {
     final response = await http.post(
       Uri.parse('$_baseUrl/api/auth/verify-email'),
-      headers: await _headers,
-      body: jsonEncode({
-        'email': email,
-      }),
-    );
-    return _handleResponse(response);
-  }
-
-  // Resend Verification
-  Future<Map<String, dynamic>> resendVerification({
-    required String email,
-  }) async {
-    final response = await http.post(
-      Uri.parse('$_baseUrl/api/auth/resend-verification'),
       headers: await _headers,
       body: jsonEncode({
         'email': email,
@@ -262,7 +370,7 @@ class ApiService extends GetxService {
               'email': email,
             }),
           )
-          .timeout(Duration(seconds: _timeoutSeconds));
+          .timeout(Duration(seconds: 10));
 
       print(
           'Reset password response status: ${response.statusCode}'); // Debug log
