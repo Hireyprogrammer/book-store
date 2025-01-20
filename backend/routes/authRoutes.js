@@ -6,6 +6,7 @@ const authMiddleware = require('../middleware/authMiddleware');
 const { body, validationResult } = require('express-validator');
 const { sendWelcomeEmail, sendPasswordResetEmail, sendVerificationPinEmail, sendResetPinEmail } = require('../utils/emailService');
 const crypto = require('crypto');
+const sendEmail = require('../utils/sendEmail');
 
 const router = express.Router();
 
@@ -16,9 +17,11 @@ const generatePin = () => {
 
 // Input Validation Middleware
 const validateRegistration = [
-  body('username').trim().isLength({ min: 3 }).withMessage('Username must be at least 3 characters'),
+  body('username').trim().notEmpty().withMessage('Username is required'),
   body('email').trim().isEmail().withMessage('Invalid email address'),
-  body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters')
+  body('password')
+    .isLength({ min: 6 })
+    .withMessage('Password must be at least 6 characters long')
 ];
 
 // Password Reset Validation
@@ -29,55 +32,144 @@ const validatePasswordReset = [
 // User Registration
 router.post('/register', validateRegistration, async (req, res) => {
   try {
-    const { username, email, password, role } = req.body;
-    console.log('\n=== Registration Attempt ===');
-    console.log('Email:', email);
-
-    // Check if user exists
-    let existingUser = await User.findOne({ $or: [{ email }, { username }] });
-    if (existingUser) {
-      return res.status(409).json({ 
-        error: 'USER_EXISTS', 
-        message: 'User already exists' 
+    // Validate request
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation error',
+        errors: errors.array()
       });
     }
 
-    // Create verification PIN
-    const verificationPin = generatePin();
-    const verificationPinExpiry = new Date(Date.now() + 15 * 60 * 1000);
+    const { username, email, password } = req.body;
 
-    // Create user with hashed password
-    const newUser = new User({
+    // Check if user already exists
+    const existingUser = await User.findOne({
+      $or: [{ email }, { username }]
+    });
+
+    if (existingUser) {
+      return res.status(400).json({
+        success: false,
+        message: existingUser.email === email ? 'Email already registered' : 'Username already taken'
+      });
+    }
+
+    // Create new user
+    const user = new User({
       username,
       email,
-      password, // Will be hashed by pre-save middleware
-      role: role || 'user',
-      verificationPin,
-      verificationPinExpiry,
-      isVerified: false
+      password
     });
 
-    await newUser.save();
-    console.log('User created successfully');
+    // Generate verification code
+    const verificationCode = user.generateVerificationCode();
+
+    // Save user
+    await user.save();
 
     // Send verification email
-    await sendVerificationPinEmail(email, username, verificationPin);
-    console.log('Verification email sent');
+    const emailData = {
+      email: user.email,
+      subject: 'Email Verification Code',
+      html: `
+        <h1>Welcome to Book Store!</h1>
+        <p>Your verification code is: <strong>${verificationCode}</strong></p>
+        <p>This code will expire in 30 minutes.</p>
+      `
+    };
+
+    await sendEmail(emailData);
 
     res.status(201).json({
-      message: 'Registration successful. Please check your email for verification.',
-      user: {
-        id: newUser._id,
-        username: newUser.username,
-        email: newUser.email,
-        isVerified: false
+      success: true,
+      message: 'Registration successful. Please check your email for verification code.',
+      data: {
+        userId: user._id,
+        username: user.username,
+        email: user.email
       }
     });
+
   } catch (error) {
     console.error('Registration error:', error);
     res.status(500).json({
-      error: 'REGISTRATION_FAILED',
-      message: 'Failed to register user'
+      success: false,
+      message: 'Error in registration',
+      error: error.message
+    });
+  }
+});
+
+// Resend verification code
+router.post('/resend-verification', async (req, res) => {
+  try {
+    console.log('Received resend verification request:', req.body);
+    const { email } = req.body;
+
+    // Validate email
+    if (!email) {
+      console.log('Missing email');
+      return res.status(400).json({
+        success: false,
+        message: 'Email is required',
+        error: 'VALIDATION_ERROR'
+      });
+    }
+
+    // Find user
+    const user = await User.findOne({ email });
+    if (!user) {
+      console.log('User not found:', email);
+      return res.status(404).json({
+        success: false,
+        message: 'User not found',
+        error: 'USER_NOT_FOUND'
+      });
+    }
+
+    // Check if already verified
+    if (user.isEmailVerified) {
+      console.log('Email already verified:', email);
+      return res.status(400).json({
+        success: false,
+        message: 'Email is already verified',
+        error: 'ALREADY_VERIFIED'
+      });
+    }
+
+    // Generate new verification code
+    const verificationCode = user.generateVerificationCode();
+    await user.save();
+
+    console.log('Generated new verification code for:', email);
+
+    // Send new verification email
+    const emailData = {
+      email: user.email,
+      subject: 'New Email Verification Code',
+      html: `
+        <h1>New Verification Code</h1>
+        <p>Your new verification code is: <strong>${verificationCode}</strong></p>
+        <p>This code will expire in 30 minutes.</p>
+      `
+    };
+
+    await sendEmail(emailData);
+    console.log('Sent new verification email to:', email);
+
+    res.status(200).json({
+      success: true,
+      message: 'New verification code sent successfully'
+    });
+
+  } catch (error) {
+    console.error('Error in resend verification:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error sending verification code',
+      error: error.message
     });
   }
 });
@@ -96,20 +188,54 @@ router.post('/verify-email', [
   }
 
   try {
+    console.log('Received verification request:', req.body);
     const { email, pin } = req.body;
 
-    // Find user with valid verification PIN
-    const user = await User.findOne({
+    // Validate input
+    if (!email || !pin) {
+      console.log('Missing email or pin');
+      return res.status(400).json({
+        success: false,
+        message: 'Email and PIN are required',
+        error: 'VALIDATION_ERROR'
+      });
+    }
+
+    // Find user by email
+    const user = await User.findOne({ email });
+    if (!user) {
+      console.log('User not found:', email);
+      return res.status(404).json({
+        success: false,
+        message: 'User not found',
+        error: 'USER_NOT_FOUND'
+      });
+    }
+
+    console.log('Verification attempt:', {
       email,
-      verificationPin: pin,
-      verificationPinExpiry: { $gt: Date.now() },
-      isVerified: false
+      providedPin: pin,
+      storedPin: user.verificationPin,
+      expires: user.verificationPinExpiry,
+      isExpired: user.verificationPinExpiry < Date.now()
     });
 
-    if (!user) {
+    // Check if PIN matches and is not expired
+    if (!user.verificationPin || user.verificationPin !== pin) {
+      console.log('Invalid verification code');
       return res.status(400).json({
-        error: 'INVALID_PIN',
-        message: 'Invalid or expired verification code'
+        success: false,
+        message: 'Invalid verification code',
+        error: 'INVALID_CODE'
+      });
+    }
+
+    if (user.verificationPinExpiry && user.verificationPinExpiry < Date.now()) {
+      console.log('Verification code expired');
+      return res.status(400).json({
+        success: false,
+        message: 'Verification code has expired',
+        error: 'CODE_EXPIRED'
       });
     }
 
@@ -118,6 +244,8 @@ router.post('/verify-email', [
     user.verificationPin = undefined;
     user.verificationPinExpiry = undefined;
     await user.save();
+
+    console.log('Email verified successfully for:', email);
 
     // Send welcome email
     await sendWelcomeEmail(user.email, user.username);
@@ -572,6 +700,15 @@ router.post('/init-admin', async (req, res) => {
       message: 'Failed to create admin user' 
     });
   }
+});
+
+// Health Check endpoint
+router.get('/health', (req, res) => {
+  res.status(200).json({
+    status: 'success',
+    message: 'Server is running',
+    timestamp: new Date().toISOString()
+  });
 });
 
 module.exports = router;

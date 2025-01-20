@@ -8,7 +8,15 @@ const PORT = process.env.PORT || 5000;
 
 // CORS Configuration
 const corsOptions = {
-  origin: true, // Allow all origins in development
+  origin: [
+    'http://localhost:3000',     // Web frontend
+    'http://localhost:5000',     // Flutter web
+    'http://10.0.2.2:5000',     // Android emulator
+    'http://192.168.100.229:*',  // Your physical device
+    'http://localhost:8080',     // Alternative port
+    'capacitor://localhost',     // Capacitor
+    'ionic://localhost',         // Ionic
+  ],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
@@ -69,9 +77,17 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Start server
+// Start server with port handling
 const server = app.listen(PORT, () => {
   console.log(`📚 Book Store Backend is running on port ${PORT} 🎉`);
+}).on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`❌ Port ${PORT} is in use. Please free up port ${PORT} and try again.`);
+    process.exit(1);
+  } else {
+    console.error('Server error:', err);
+    process.exit(1);
+  }
 });
 
 // Graceful Shutdown
