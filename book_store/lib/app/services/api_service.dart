@@ -72,23 +72,16 @@ class ApiService extends GetxService {
     required String email,
     required String password,
   }) async {
-    try {
-      final response = await http
-          .post(
-            Uri.parse('$_baseUrl/api/auth/register'),
-            headers: await _headers,
-            body: jsonEncode({
-              'name': name,
-              'email': email,
-              'password': password,
-            }),
-          )
-          .timeout(Duration(seconds: _timeoutSeconds));
-
-      return _handleResponse(response);
-    } catch (e) {
-      return _handleError(e);
-    }
+    final response = await http.post(
+      Uri.parse('$_baseUrl/api/auth/register'),
+      headers: await _headers,
+      body: jsonEncode({
+        'name': name,
+        'email': email,
+        'password': password,
+      }),
+    );
+    return _handleResponse(response);
   }
 
   // User Login
@@ -141,6 +134,54 @@ class ApiService extends GetxService {
       }
       return _handleError(e);
     }
+  }
+
+  // Verify OTP
+  Future<Map<String, dynamic>> verifyOtp({
+    required String email,
+    required String otp,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$_baseUrl/api/verify-otp'),
+        headers: await _headers,
+        body: jsonEncode({
+          'email': email,
+          'otp': otp,
+        }),
+      );
+      return _handleResponse(response);
+    } catch (e) {
+      return _handleError(e);
+    }
+  }
+
+  // Verify Email
+  Future<Map<String, dynamic>> verifyEmail({
+    required String email,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$_baseUrl/api/auth/verify-email'),
+      headers: await _headers,
+      body: jsonEncode({
+        'email': email,
+      }),
+    );
+    return _handleResponse(response);
+  }
+
+  // Resend Verification
+  Future<Map<String, dynamic>> resendVerification({
+    required String email,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$_baseUrl/api/auth/resend-verification'),
+      headers: await _headers,
+      body: jsonEncode({
+        'email': email,
+      }),
+    );
+    return _handleResponse(response);
   }
 
   // Logout

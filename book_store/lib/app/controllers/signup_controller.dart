@@ -103,63 +103,45 @@ class SignupController extends GetxController {
     return hasUppercase && hasLowercase && hasNumber && hasSpecialChar;
   }
 
-  Future<void> signup() async {
-    // Validate all inputs
-    validateName(nameController.text);
-    validateEmail(emailController.text);
-    validatePassword(passwordController.text);
-    validateConfirmPassword(confirmPasswordController.text);
+  Future<void> signUp() async {
+    isLoading.value = true;
+    nameError.value = '';
+    emailError.value = '';
+    passwordError.value = '';
+    confirmPasswordError.value = '';
 
-    // Check if all validations pass
-    if (nameError.value.isNotEmpty || 
-        emailError.value.isNotEmpty || 
-        passwordError.value.isNotEmpty || 
-        confirmPasswordError.value.isNotEmpty) {
-      return;
+    if (nameController.text.isEmpty) {
+      nameError.value = 'Name is required';
+    }
+    if (emailController.text.isEmpty) {
+      emailError.value = 'Email is required';
+    }
+    if (passwordController.text.isEmpty) {
+      passwordError.value = 'Password is required';
+    }
+    if (confirmPasswordController.text.isEmpty) {
+      confirmPasswordError.value = 'Confirm password is required';
+    }
+    if (passwordController.text != confirmPasswordController.text) {
+      confirmPasswordError.value = 'Passwords do not match';
     }
 
-    isLoading.value = true;
-
-    try {
+    if (nameError.value.isEmpty && emailError.value.isEmpty && passwordError.value.isEmpty && confirmPasswordError.value.isEmpty) {
       final response = await _apiService.register(
-        name: nameController.text.trim(),
-        email: emailController.text.trim(), 
-        password: passwordController.text.trim()
+        name: nameController.text,
+        email: emailController.text,
+        password: passwordController.text,
       );
 
       if (response['success']) {
-        // Navigate to login screen
-        Get.offAllNamed(AppRoutes.login);
-        
-        // Show success message
-        Get.snackbar(
-          'Success', 
-          'Account created successfully. Please log in.',
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.green,
-          colorText: Colors.white,
-        );
+        // Navigate to the OTP verification screen
+        Get.toNamed(Routes.OTP_VERIFICATION);
       } else {
-        // Show error message from backend
-        Get.snackbar(
-          'Registration Failed', 
-          response['message'] ?? 'Unable to create account',
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.red,
-          colorText: Colors.white,
-        );
+        // Handle error message
+        emailError.value = response['message'];
       }
-    } catch (e) {
-      Get.snackbar(
-        'Error', 
-        'An unexpected error occurred: ${e.toString()}',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
-    } finally {
-      isLoading.value = false;
     }
+    isLoading.value = false;
   }
 
   void navigateToLogin() {

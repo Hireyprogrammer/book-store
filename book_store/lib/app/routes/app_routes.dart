@@ -9,4 +9,5 @@ abstract class Routes {
   static const HOME = '/home';
   static const BOOK_DETAILS = '/book-details';
   static const FORGOT_PASSWORD = '/forgot-password';
+  static const OTP_VERIFICATION = '/otp-verification';
 }
