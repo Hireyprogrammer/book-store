@@ -188,24 +188,17 @@ router.post('/verify-email', [
   body('email').trim().isEmail().withMessage('Invalid email address'),
   body('pin').trim().isLength({ min: 6, max: 6 }).withMessage('Invalid PIN code')
 ], async (req, res) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(400).json({ 
-      error: 'Validation Failed', 
-      details: errors.array() 
-    });
-  }
-
   try {
     console.log('Received verification request:', req.body);
-    const { email, pin } = req.body;
+    const { email, pin, otp } = req.body;
+    const verificationCode = pin || otp; // Accept either pin or otp
 
     // Validate input
-    if (!email || !pin) {
-      console.log('Missing email or pin');
+    if (!email || !verificationCode) {
+      console.log('Missing email or verification code');
       return res.status(400).json({
         success: false,
-        message: 'Email and PIN are required',
+        message: 'Email and verification code are required',
         error: 'VALIDATION_ERROR'
       });
     }
@@ -229,15 +222,45 @@ router.post('/verify-email', [
       verificationCode: user.verificationCode,
       verificationCodeExpires: user.verificationCodeExpires,
       currentTime: new Date(),
-      providedPin: pin
+      providedCode: verificationCode
     });
 
-    // Check if PIN matches and is not expired
-    if (!user.verifyCode(pin)) {
-      console.log('Invalid or expired verification code');
+    // Check if already verified
+    if (user.isEmailVerified) {
+      console.log('Email already verified:', email);
       return res.status(400).json({
         success: false,
-        message: 'Invalid verification code or code has expired',
+        message: 'Email is already verified',
+        error: 'ALREADY_VERIFIED'
+      });
+    }
+
+    // Check if verification code exists and is valid
+    if (!user.verificationCode || !user.verificationCodeExpires) {
+      console.log('No verification code found');
+      return res.status(400).json({
+        success: false,
+        message: 'No verification code found. Please request a new code.',
+        error: 'NO_CODE'
+      });
+    }
+
+    // Check if code has expired
+    if (user.verificationCodeExpires < new Date()) {
+      console.log('Verification code expired');
+      return res.status(400).json({
+        success: false,
+        message: 'Verification code has expired. Please request a new code.',
+        error: 'CODE_EXPIRED'
+      });
+    }
+
+    // Check if code matches
+    if (user.verificationCode !== verificationCode) {
+      console.log('Invalid verification code');
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid verification code',
         error: 'INVALID_CODE'
       });
     }
@@ -250,9 +273,6 @@ router.post('/verify-email', [
 
     console.log('Email verified successfully for:', email);
 
-    // Send welcome email
-    await sendWelcomeEmail(user.email, user.username);
-
     // Generate JWT token
     const authToken = jwt.sign(
       { userId: user._id, role: user.role },
@@ -261,6 +281,7 @@ router.post('/verify-email', [
     );
 
     res.json({
+      success: true,
       message: 'Email verified successfully',
       token: authToken,
       user: {
@@ -273,6 +294,7 @@ router.post('/verify-email', [
   } catch (error) {
     console.error('Email verification error:', error);
     res.status(500).json({
+      success: false,
       error: 'VERIFICATION_FAILED',
       message: 'Failed to verify email'
     });

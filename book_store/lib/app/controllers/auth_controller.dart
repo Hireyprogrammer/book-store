@@ -93,39 +93,45 @@ class AuthController extends GetxController {
         currentText.value = '';
         remainingAttempts.value = 3;
         
-        // Store token if available
-        if (response['token'] != null) {
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('auth_token', response['token']);
-        }
-        
         Get.snackbar(
           'Success',
-          'Email verified successfully',
+          'Email verified successfully. Please login to continue.',
           snackPosition: SnackPosition.BOTTOM,
           backgroundColor: Colors.green[100],
           colorText: Colors.green[900],
           duration: const Duration(seconds: 2),
         );
         
-        // Update auth status and navigate
-        await checkAuthStatus();
-        Get.offAllNamed(AppRoutes.home);
+        // Navigate to login after short delay to show success message
+        await Future.delayed(const Duration(seconds: 1));
+        Get.offAllNamed(AppRoutes.login);
       } else {
-        // Decrease remaining attempts
-        remainingAttempts.value--;
+        // Handle specific error cases
+        String errorMessage = '';
+        switch (response['error']) {
+          case 'ALREADY_VERIFIED':
+            errorMessage = 'Email is already verified. Please login.';
+            break;
+          case 'CODE_EXPIRED':
+            errorMessage = 'Code has expired. Please request a new code.';
+            break;
+          case 'INVALID_CODE':
+            remainingAttempts.value--;
+            errorMessage = 'Invalid code. ${remainingAttempts.value} attempts remaining.';
+            break;
+          case 'NO_CODE':
+            errorMessage = 'No valid code found. Please request a new code.';
+            break;
+          default:
+            errorMessage = response['message'] ?? 'Verification failed. Please try again.';
+        }
         
         errorController.add(ErrorAnimationType.shake);
-        errorMessage.value = response['message'] ?? 'Invalid verification code';
+        this.errorMessage.value = errorMessage;
         
-        // Show appropriate error message based on remaining attempts
-        final attemptsLeft = remainingAttempts.value > 0 
-            ? '${remainingAttempts.value} attempts remaining.' 
-            : 'No attempts remaining. Please request a new code.';
-            
         Get.snackbar(
           'Verification Failed',
-          '${errorMessage.value}\n$attemptsLeft',
+          errorMessage,
           snackPosition: SnackPosition.BOTTOM,
           backgroundColor: Colors.red[100],
           colorText: Colors.red[900],
@@ -135,6 +141,15 @@ class AuthController extends GetxController {
         // Clear OTP input on error
         otpController.clear();
         currentText.value = '';
+        
+        // If no attempts remaining, disable input
+        if (remainingAttempts.value <= 0) {
+          canResendCode.value = true;
+          resendTimer.value = 0;
+          if (_resendTimer?.isActive ?? false) {
+            _resendTimer?.cancel();
+          }
+        }
       }
     } catch (e) {
       print('Verification Error: $e'); // Debug log

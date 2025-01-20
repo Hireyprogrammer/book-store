@@ -201,14 +201,15 @@ class ApiService extends GetxService {
       print('🌐 Base URL: $_baseUrl');
       print('📍 Endpoint: $_baseUrl${AppConfig.verifyEmailEndpoint}');
       print('📧 Email: $email');
-      print('🔑 OTP: $otp');
+      print('🔑 Verification Code: $otp');
       
       final headers = await _headers;
       print('📤 Request Headers: $headers');
       
       final requestBody = {
         'email': email,
-        'otp': otp,
+        'pin': otp,
+        'otp': otp,  // Send both for compatibility
       };
       print('📦 Request Body: ${jsonEncode(requestBody)}');
 
@@ -227,7 +228,7 @@ class ApiService extends GetxService {
       final result = _handleResponse(response);
       print('🔄 Processed Result: $result');
 
-      if (result['success'] && result['token'] != null) {
+      if (result['success'] == true && result['token'] != null) {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('auth_token', result['token']);
         print('✅ Token stored successfully');
