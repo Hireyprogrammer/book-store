@@ -24,6 +24,7 @@ class AuthController extends GetxController {
   final RxString currentText = ''.obs;
   final RxBool canResendCode = true.obs;
   final RxInt resendTimer = 60.obs;
+  final RxInt remainingAttempts = 3.obs;  // Track remaining attempts
   Timer? _resendTimer;
 
   @override
@@ -53,6 +54,21 @@ class AuthController extends GetxController {
       isLoading.value = true;
       errorMessage.value = '';
       
+      // Check remaining attempts
+      if (remainingAttempts.value <= 0) {
+        errorController.add(ErrorAnimationType.shake);
+        errorMessage.value = 'Too many invalid attempts. Please request a new code.';
+        Get.snackbar(
+          'Verification Locked',
+          errorMessage.value,
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.red[100],
+          colorText: Colors.red[900],
+          duration: const Duration(seconds: 3),
+        );
+        return;
+      }
+      
       // Validate OTP format
       if (otp.length != 6 || !RegExp(r'^\d{6}$').hasMatch(otp)) {
         errorController.add(ErrorAnimationType.shake);
@@ -60,6 +76,7 @@ class AuthController extends GetxController {
         Get.snackbar(
           'Invalid Code',
           errorMessage.value,
+          snackPosition: SnackPosition.BOTTOM,
           backgroundColor: Colors.red[100],
           colorText: Colors.red[900],
           duration: const Duration(seconds: 3),
@@ -68,15 +85,24 @@ class AuthController extends GetxController {
       }
       
       final response = await _apiService.verifyOtp(email: email, otp: otp);
+      print('Verification Response: $response'); // Debug log
       
-      if (response['success']) {
-        // Clear OTP input
+      if (response['success'] == true) {
+        // Clear OTP input and reset attempts
         otpController.clear();
         currentText.value = '';
+        remainingAttempts.value = 3;
+        
+        // Store token if available
+        if (response['token'] != null) {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('auth_token', response['token']);
+        }
         
         Get.snackbar(
           'Success',
           'Email verified successfully',
+          snackPosition: SnackPosition.BOTTOM,
           backgroundColor: Colors.green[100],
           colorText: Colors.green[900],
           duration: const Duration(seconds: 2),
@@ -86,11 +112,21 @@ class AuthController extends GetxController {
         await checkAuthStatus();
         Get.offAllNamed(AppRoutes.home);
       } else {
+        // Decrease remaining attempts
+        remainingAttempts.value--;
+        
         errorController.add(ErrorAnimationType.shake);
         errorMessage.value = response['message'] ?? 'Invalid verification code';
+        
+        // Show appropriate error message based on remaining attempts
+        final attemptsLeft = remainingAttempts.value > 0 
+            ? '${remainingAttempts.value} attempts remaining.' 
+            : 'No attempts remaining. Please request a new code.';
+            
         Get.snackbar(
           'Verification Failed',
-          errorMessage.value,
+          '${errorMessage.value}\n$attemptsLeft',
+          snackPosition: SnackPosition.BOTTOM,
           backgroundColor: Colors.red[100],
           colorText: Colors.red[900],
           duration: const Duration(seconds: 3),
@@ -101,11 +137,13 @@ class AuthController extends GetxController {
         currentText.value = '';
       }
     } catch (e) {
+      print('Verification Error: $e'); // Debug log
       errorController.add(ErrorAnimationType.shake);
       errorMessage.value = 'Failed to verify code. Please try again.';
       Get.snackbar(
         'Error',
         errorMessage.value,
+        snackPosition: SnackPosition.BOTTOM,
         backgroundColor: Colors.red[100],
         colorText: Colors.red[900],
         duration: const Duration(seconds: 3),
@@ -129,9 +167,13 @@ class AuthController extends GetxController {
       final response = await _apiService.resendVerification(email: email);
       
       if (response['success']) {
+        // Reset attempts when new code is sent
+        remainingAttempts.value = 3;
+        
         Get.snackbar(
           'Success',
           'Verification code sent successfully',
+          snackPosition: SnackPosition.BOTTOM,
           backgroundColor: Colors.green[100],
           colorText: Colors.green[900],
           duration: const Duration(seconds: 2),
@@ -142,6 +184,7 @@ class AuthController extends GetxController {
         Get.snackbar(
           'Error',
           errorMessage.value,
+          snackPosition: SnackPosition.BOTTOM,
           backgroundColor: Colors.red[100],
           colorText: Colors.red[900],
           duration: const Duration(seconds: 3),
@@ -152,6 +195,7 @@ class AuthController extends GetxController {
       Get.snackbar(
         'Error',
         errorMessage.value,
+        snackPosition: SnackPosition.BOTTOM,
         backgroundColor: Colors.red[100],
         colorText: Colors.red[900],
         duration: const Duration(seconds: 3),

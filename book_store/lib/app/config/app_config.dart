@@ -7,6 +7,7 @@ class AppConfig {
   static const String registerEndpoint = '/api/auth/register';
   static const String loginEndpoint = '/api/auth/login';
   static const String verifyEmailEndpoint = '/api/auth/verify-email';
+  static const String resendVerificationEndpoint = '/api/auth/resend-verification';
   
   // Timeout Configurations
   static const int connectionTimeout = 30; // seconds

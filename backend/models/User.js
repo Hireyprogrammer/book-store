@@ -25,7 +25,8 @@ const UserSchema = new mongoose.Schema({
     default: false
   },
   verificationCode: {
-    type: String
+    type: String,
+    trim: true
   },
   verificationCodeExpires: {
     type: Date
@@ -65,9 +66,23 @@ UserSchema.methods.comparePassword = async function(candidatePassword) {
 
 // Generate verification code
 UserSchema.methods.generateVerificationCode = function() {
-  this.verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+  const code = Math.floor(100000 + Math.random() * 900000).toString();
+  this.verificationCode = code;
   this.verificationCodeExpires = new Date(Date.now() + 30 * 60000); // 30 minutes
-  return this.verificationCode;
+  return code;
+};
+
+// Add method to verify code
+UserSchema.methods.verifyCode = function(code) {
+  if (!this.verificationCode || !this.verificationCodeExpires) {
+    return false;
+  }
+  
+  if (this.verificationCodeExpires < Date.now()) {
+    return false;
+  }
+
+  return this.verificationCode === code;
 };
 
 const User = mongoose.model('User', UserSchema);

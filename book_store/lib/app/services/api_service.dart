@@ -234,18 +234,8 @@ class ApiService extends GetxService {
       }
 
       return result;
-    } on SocketException catch (e) {
-      print('❌ Socket Exception during OTP verification: $e');
-      print('🔍 Error Details: ${e.message}');
-      print('🔌 Address: ${e.address}');
-      print('🔌 Port: ${e.port}');
-      return _handleError(e);
-    } on TimeoutException catch (e) {
-      print('⏰ Timeout Exception during OTP verification: $e');
-      return _handleError(e);
     } catch (e) {
-      print('❌ General Error during OTP verification: $e');
-      print('🔍 Error Type: ${e.runtimeType}');
+      print('❌ Error during verification: $e');
       return _handleError(e);
     }
   }
@@ -255,25 +245,31 @@ class ApiService extends GetxService {
     required String email,
   }) async {
     try {
-      print('📨 Requesting new verification code: $_baseUrl/api/auth/resend-verification'); // Debug log
-      print('📧 Email: $email'); // Debug log
+      print('📨 Requesting new verification code:');
+      print('🌐 Base URL: $_baseUrl');
+      print('📍 Endpoint: $_baseUrl${AppConfig.resendVerificationEndpoint}');
+      print('📧 Email: $email');
+
+      final headers = await _headers;
+      print('📤 Request Headers: $headers');
 
       final response = await http
           .post(
-            Uri.parse('$_baseUrl/api/auth/resend-verification'),
-            headers: await _headers,
+            Uri.parse('$_baseUrl${AppConfig.resendVerificationEndpoint}'),
+            headers: headers,
             body: jsonEncode({
               'email': email,
             }),
           )
-          .timeout(Duration(seconds: 10));
+          .timeout(const Duration(seconds: AppConfig.connectionTimeout));
 
-      print('📥 Resend verification response status: ${response.statusCode}'); // Debug log
-      print('📄 Resend verification response body: ${response.body}'); // Debug log
+      print('📥 Response Status Code: ${response.statusCode}');
+      print('📥 Response Headers: ${response.headers}');
+      print('📥 Response Body: ${response.body}');
 
       return _handleResponse(response);
     } catch (e) {
-      print('❌ Resend verification error: $e'); // Debug log
+      print('❌ Error during resend verification: $e');
       return _handleError(e);
     }
   }

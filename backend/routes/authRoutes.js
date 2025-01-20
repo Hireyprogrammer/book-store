@@ -232,37 +232,20 @@ router.post('/verify-email', [
       providedPin: pin
     });
 
-    console.log('Verification attempt:', {
-      email,
-      providedPin: pin,
-      storedPin: user.verificationPin,
-      expires: user.verificationPinExpiry,
-      isExpired: user.verificationPinExpiry < Date.now()
-    });
-
     // Check if PIN matches and is not expired
-    if (!user.verificationPin || user.verificationPin !== pin) {
-      console.log('Invalid verification code');
+    if (!user.verifyCode(pin)) {
+      console.log('Invalid or expired verification code');
       return res.status(400).json({
         success: false,
-        message: 'Invalid verification code',
+        message: 'Invalid verification code or code has expired',
         error: 'INVALID_CODE'
       });
     }
 
-    if (user.verificationPinExpiry && user.verificationPinExpiry < Date.now()) {
-      console.log('Verification code expired');
-      return res.status(400).json({
-        success: false,
-        message: 'Verification code has expired',
-        error: 'CODE_EXPIRED'
-      });
-    }
-
     // Update user verification status
-    user.isVerified = true;
-    user.verificationPin = undefined;
-    user.verificationPinExpiry = undefined;
+    user.isEmailVerified = true;
+    user.verificationCode = undefined;
+    user.verificationCodeExpires = undefined;
     await user.save();
 
     console.log('Email verified successfully for:', email);

@@ -237,7 +237,7 @@ class SignupScreen extends GetView<SignupController> {
                       Obx(() => TextField(
                         controller: controller.confirmPasswordController,
                         onChanged: controller.validateConfirmPassword,
-                        obscureText: !controller.isPasswordVisible.value,
+                        obscureText: !controller.isConfirmPasswordVisible.value,
                         style: const TextStyle(
                           fontSize: 16,
                           color: Color(0xFF2C3E50),
@@ -252,6 +252,15 @@ class SignupScreen extends GetView<SignupController> {
                             fontWeight: FontWeight.w400,
                           ),
                           prefixIcon: const Icon(Icons.lock_outline, color: Color(0xFF1565C0)),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              controller.isConfirmPasswordVisible.value
+                                  ? Icons.visibility_off
+                                  : Icons.visibility,
+                              color: const Color(0xFF1565C0),
+                            ),
+                            onPressed: controller.toggleConfirmPasswordVisibility,
+                          ),
                           filled: true,
                           fillColor: Colors.grey[50],
                           border: OutlineInputBorder(

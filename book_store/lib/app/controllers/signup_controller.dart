@@ -14,6 +14,7 @@ class SignupController extends GetxController {
 
   // Observables for form state and validation
   final RxBool isPasswordVisible = false.obs;
+  final RxBool isConfirmPasswordVisible = false.obs;
   final RxString nameError = RxString('');
   final RxString emailError = RxString('');
   final RxString passwordError = RxString('');
@@ -42,6 +43,10 @@ class SignupController extends GetxController {
 
   void togglePasswordVisibility() {
     isPasswordVisible.value = !isPasswordVisible.value;
+  }
+
+  void toggleConfirmPasswordVisibility() {
+    isConfirmPasswordVisible.value = !isConfirmPasswordVisible.value;
   }
 
   void validateName(String? name) {
