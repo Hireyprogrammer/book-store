@@ -357,62 +357,95 @@ router.post('/login', [
     const { email, password } = req.body;
     console.log('\n=== Login Attempt ===');
     console.log('Email:', email);
-    console.log('Password length:', password.length);
 
     // Find user
     const user = await User.findOne({ email });
     if (!user) {
       console.log('No user found with email:', email);
       return res.status(401).json({
+        success: false,
         error: 'INVALID_CREDENTIALS',
         message: 'Invalid email or password'
       });
     }
 
-    console.log('Found user:', {
+    // Debug log to check verification status
+    console.log('User verification status:', {
       id: user._id,
       email: user.email,
-      isVerified: user.isVerified,
-      passwordLength: user.password.length
+      isEmailVerified: user.isEmailVerified,
+      isVerified: user.isVerified // Check if there's a naming conflict
     });
 
-    // Check if email is verified
-    if (!user.isVerified) {
-      console.log('User not verified:', email);
-      return res.status(401).json({
-        error: 'EMAIL_NOT_VERIFIED',
-        message: 'Please verify your email before logging in'
-      });
-    }
-
-    // Check password
+    // Check password first
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
       console.log('Password mismatch for:', email);
       return res.status(401).json({
+        success: false,
         error: 'INVALID_CREDENTIALS',
         message: 'Invalid email or password'
       });
     }
 
+    // Check if email is verified
+    if (user.isEmailVerified !== true) {
+      console.log('User not verified:', email);
+      
+      // Generate new verification code
+      const verificationCode = user.generateVerificationCode();
+      await user.save();
+
+      // Send new verification email
+      const emailData = {
+        email: user.email,
+        subject: 'Email Verification Code',
+        html: `
+          <h1>Email Verification Required</h1>
+          <p>Please verify your email to login. Your verification code is: <strong>${verificationCode}</strong></p>
+          <p>This code will expire in 30 minutes.</p>
+        `
+      };
+
+      await sendEmail(emailData);
+
+      return res.status(401).json({
+        success: false,
+        error: 'EMAIL_NOT_VERIFIED',
+        message: 'Please verify your email before logging in. A new verification code has been sent to your email.'
+      });
+    }
+
     // Generate token
-    const token = user.generateAuthToken();
+    const token = jwt.sign(
+      { 
+        userId: user._id,
+        email: user.email,
+        role: user.role,
+        isVerified: true
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: process.env.JWT_EXPIRATION }
+    );
+
     console.log('Login successful for:', email);
 
     res.json({
+      success: true,
       message: 'Login successful',
       token,
       user: {
         id: user._id,
         username: user.username,
         email: user.email,
-        role: user.role,
-        isVerified: user.isVerified
+        isVerified: true,
+        role: user.role
       }
     });
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({
+      success: false,
       error: 'LOGIN_FAILED',
       message: 'An error occurred during login'
     });

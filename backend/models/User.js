@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 
 const UserSchema = new mongoose.Schema({
   username: {
@@ -72,7 +73,7 @@ UserSchema.methods.generateVerificationCode = function() {
   return code;
 };
 
-// Add method to verify code
+// Verify code method
 UserSchema.methods.verifyCode = function(code) {
   if (!this.verificationCode || !this.verificationCodeExpires) {
     return false;
@@ -82,8 +83,30 @@ UserSchema.methods.verifyCode = function(code) {
     return false;
   }
 
-  return this.verificationCode === code;
+  const isValid = this.verificationCode === code;
+  if (isValid) {
+    this.isEmailVerified = true;
+    this.verificationCode = undefined;
+    this.verificationCodeExpires = undefined;
+  }
+  return isValid;
 };
+
+// Add virtual getter for verification status
+UserSchema.virtual('isVerified').get(function() {
+  return this.isEmailVerified === true;
+});
+
+// Ensure virtuals are included in JSON
+UserSchema.set('toJSON', {
+  virtuals: true,
+  transform: function(doc, ret) {
+    delete ret.password;
+    delete ret.verificationCode;
+    delete ret.verificationCodeExpires;
+    return ret;
+  }
+});
 
 const User = mongoose.model('User', UserSchema);
 

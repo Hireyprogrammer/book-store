@@ -136,30 +136,33 @@ class ApiService extends GetxService {
     }
   }
 
-  // User Login
+  // Login user
   Future<Map<String, dynamic>> login({
     required String email,
     required String password,
   }) async {
     try {
-      print('🔐 Attempting login with following details:');
+      print('🔐 Attempting Login:');
       print('🌐 Base URL: $_baseUrl');
-      print('📍 Endpoint: $_baseUrl/api/auth/login');
+      print('📍 Endpoint: $_baseUrl${AppConfig.loginEndpoint}');
       print('📧 Email: $email');
       
       final headers = await _headers;
       print('📤 Request Headers: $headers');
+      
+      final requestBody = {
+        'email': email,
+        'password': password,
+      };
+      print('📦 Request Body: ${jsonEncode(requestBody)}');
 
       final response = await http
           .post(
-            Uri.parse('$_baseUrl/api/auth/login'),
+            Uri.parse('$_baseUrl${AppConfig.loginEndpoint}'),
             headers: headers,
-            body: jsonEncode({
-              'email': email,
-              'password': password,
-            }),
+            body: jsonEncode(requestBody),
           )
-          .timeout(const Duration(seconds: 10));
+          .timeout(const Duration(seconds: AppConfig.connectionTimeout));
 
       print('📥 Response Status Code: ${response.statusCode}');
       print('📥 Response Headers: ${response.headers}');
@@ -168,25 +171,15 @@ class ApiService extends GetxService {
       final result = _handleResponse(response);
       print('🔄 Processed Result: $result');
 
-      if (result['success'] && result['token'] != null) {
+      if (result['success'] == true && result['token'] != null) {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('auth_token', result['token']);
         print('✅ Token stored successfully');
       }
 
       return result;
-    } on SocketException catch (e) {
-      print('❌ Socket Exception: $e');
-      print('🔍 Error Details: ${e.message}');
-      print('🔌 Address: ${e.address}');
-      print('🔌 Port: ${e.port}');
-      return _handleError(e);
-    } on TimeoutException catch (e) {
-      print('⏰ Timeout Exception: $e');
-      return _handleError(e);
     } catch (e) {
-      print('❌ General Error: $e');
-      print('🔍 Error Type: ${e.runtimeType}');
+      print('❌ Error during login: $e');
       return _handleError(e);
     }
   }

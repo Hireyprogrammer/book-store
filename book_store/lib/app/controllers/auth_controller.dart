@@ -276,50 +276,99 @@ class AuthController extends GetxController {
     }
   }
 
-  Future<void> login({
-    required String email,
-    required String password,
-  }) async {
+  Future<void> login({required String email, required String password}) async {
     try {
+      if (isLoading.value) return;
+      
       isLoading.value = true;
+      errorMessage.value = '';
+      
+      // Basic validation
+      if (email.isEmpty || !GetUtils.isEmail(email)) {
+        errorMessage.value = 'Please enter a valid email address';
+        Get.snackbar(
+          'Invalid Email',
+          errorMessage.value,
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.red[100],
+          colorText: Colors.red[900],
+          duration: const Duration(seconds: 3),
+        );
+        return;
+      }
+      
+      if (password.isEmpty || password.length < 6) {
+        errorMessage.value = 'Password must be at least 6 characters';
+        Get.snackbar(
+          'Invalid Password',
+          errorMessage.value,
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.red[100],
+          colorText: Colors.red[900],
+          duration: const Duration(seconds: 3),
+        );
+        return;
+      }
+      
       final response = await _apiService.login(
         email: email,
         password: password,
       );
-
-      if (response['success']) {
-        // Update authentication state
-        token.value = response['token'];
-        isAuthenticated.value = true;
-        userData.value = response['data'];
-
-        // Navigate to home screen
-        Get.offAllNamed('/home');
-
-        Get.snackbar(
-          'Success',
-          'Logged in successfully',
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.green,
-          colorText: Colors.white,
-        );
+      
+      if (response['success'] == true) {
+        // Store user data
+        if (response['token'] != null) {
+          token.value = response['token'];
+          isAuthenticated.value = true;
+          
+          if (response['user'] != null) {
+            userData.value = response['user'];
+          }
+          
+          Get.snackbar(
+            'Success',
+            'Login successful',
+            snackPosition: SnackPosition.BOTTOM,
+            backgroundColor: Colors.green[100],
+            colorText: Colors.green[900],
+            duration: const Duration(seconds: 2),
+          );
+          
+          // Navigate to home after short delay
+          await Future.delayed(const Duration(seconds: 1));
+          Get.offAllNamed(AppRoutes.home);
+        }
       } else {
-        // Handle login failure
+        String errorMessage = '';
+        switch (response['error']) {
+          case 'EMAIL_NOT_VERIFIED':
+            errorMessage = 'Please verify your email before logging in';
+            break;
+          case 'INVALID_CREDENTIALS':
+            errorMessage = 'Invalid email or password';
+            break;
+          default:
+            errorMessage = response['message'] ?? 'Login failed. Please try again.';
+        }
+        
         Get.snackbar(
-          'Error',
-          response['message'] ?? 'Login failed',
+          'Login Failed',
+          errorMessage,
           snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.red,
-          colorText: Colors.white,
+          backgroundColor: Colors.red[100],
+          colorText: Colors.red[900],
+          duration: const Duration(seconds: 3),
         );
       }
     } catch (e) {
+      print('Login Error: $e');
       Get.snackbar(
         'Error',
-        'An unexpected error occurred',
+        'Failed to login. Please try again.',
         snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
+        backgroundColor: Colors.red[100],
+        colorText: Colors.red[900],
+        duration: const Duration(seconds: 3),
       );
     } finally {
       isLoading.value = false;
