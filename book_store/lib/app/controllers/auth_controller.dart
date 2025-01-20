@@ -39,7 +39,7 @@ class AuthController extends GetxController {
       
       // Perform server health check
       final healthCheckResult = await _apiService.checkServerHealth();
-      isServerConnected.value = healthCheckResult['status'] ?? false;
+      isServerConnected.value = healthCheckResult['success'] ?? false;
 
       // Generate comprehensive connection report
       connectionReport.value = {

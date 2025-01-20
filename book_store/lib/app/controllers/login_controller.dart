@@ -72,7 +72,7 @@ class LoginController extends GetxController {
 
       // Perform server health check first
       final healthCheck = await ApiService.to.checkServerHealth();
-      if (!healthCheck['status']) {
+      if (!healthCheck['success']) {
         Get.snackbar(
           'Server Unavailable', 
           healthCheck['message'] ?? 'Could not connect to server',
@@ -93,14 +93,14 @@ class LoginController extends GetxController {
 
       isLoading.value = false;
 
-      if (response['status']) {
+      if (response['success'] == true) {
         // Successful login
         Get.offAllNamed(AppRoutes.home);
       } else {
         // Login failed
         Get.snackbar(
-          'Login Failed', 
-          response['message'] ?? 'Invalid credentials',
+          'Login Failed',
+          response['message'] ?? 'Invalid email or password',
           snackPosition: SnackPosition.BOTTOM,
           backgroundColor: Colors.red,
           colorText: Colors.white,

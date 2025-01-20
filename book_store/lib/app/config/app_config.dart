@@ -1,6 +1,6 @@
 class AppConfig {
   // Backend Server Configuration
-  static const String baseUrl = 'http://localhost:5000/api';
+  static const String baseUrl = 'http://localhost:5000';
   
   // Timeout Configurations
   static const int connectionTimeout = 30; // seconds
@@ -19,13 +19,12 @@ class AppConfig {
 
   // Validate Server URL
   static bool isValidServerUrl(String url) {
-    final urlPattern = RegExp(
-      r'^(https?://)?'
-      r'(([a-z\d]([a-z\d-]*[a-z\d])*)\.)+[a-z]{2,}'
-      r'(:\d+)?(/.*)?$',
-      caseSensitive: false,
-    );
-    return urlPattern.hasMatch(url);
+    try {
+      final uri = Uri.parse(url);
+      return uri.isScheme('http') || uri.isScheme('https');
+    } catch (e) {
+      return false;
+    }
   }
 }
 

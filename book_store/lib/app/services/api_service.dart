@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'dart:async';
+import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -16,40 +18,52 @@ class ApiService extends GetxService {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
     return {
-      ...AppConfig.headers,
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
       if (token != null) 'Authorization': 'Bearer $token',
     };
   }
 
-  // Comprehensive Health Check Method
-  Future<Map<String, dynamic>> checkServerHealth() async {
+  // Response Handler
+  Map<String, dynamic> _handleResponse(http.Response response) {
     try {
-      final response = await http.get(
-        Uri.parse('$_baseUrl/health'),
-        headers: await _headers,
-      ).timeout(Duration(seconds: _timeoutSeconds));
+      final data = jsonDecode(response.body);
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
+      if (response.statusCode >= 200 && response.statusCode < 300) {
         return {
-          'status': true,
-          'message': 'Server is healthy',
-          'details': data
+          'success': true,
+          'data': data,
+          'message': data['message'] ?? 'Operation successful',
+          'token': data['token'],
         };
       } else {
         return {
-          'status': false,
-          'message': 'Server returned non-200 status',
-          'code': response.statusCode
+          'success': false,
+          'message': data['message'] ?? 'Operation failed',
+          'error': data['error'] ?? 'Unknown error',
+          'statusCode': response.statusCode,
         };
       }
     } catch (e) {
+      print('Response parsing error: $e'); // Debug log
       return {
-        'status': false,
-        'message': 'Could not connect to server',
-        'error': e.toString()
+        'success': false,
+        'message': 'Failed to process server response',
+        'error': e.toString(),
       };
     }
+  }
+
+  // Error Handler
+  Map<String, dynamic> _handleError(dynamic error) {
+    print('API Error: $error'); // For debugging
+    return {
+      'success': false,
+      'message': error is TimeoutException
+          ? 'Connection timeout. Please try again.'
+          : 'An error occurred: ${error.toString()}',
+      'error': error.toString(),
+    };
   }
 
   // User Registration
@@ -59,15 +73,17 @@ class ApiService extends GetxService {
     required String password,
   }) async {
     try {
-      final response = await http.post(
-        Uri.parse('$_baseUrl/api/auth/register'),
-        headers: await _headers,
-        body: jsonEncode({
-          'name': name,
-          'email': email,
-          'password': password,
-        }),
-      ).timeout(Duration(seconds: _timeoutSeconds));
+      final response = await http
+          .post(
+            Uri.parse('$_baseUrl/api/auth/register'),
+            headers: await _headers,
+            body: jsonEncode({
+              'name': name,
+              'email': email,
+              'password': password,
+            }),
+          )
+          .timeout(Duration(seconds: _timeoutSeconds));
 
       return _handleResponse(response);
     } catch (e) {
@@ -81,17 +97,25 @@ class ApiService extends GetxService {
     required String password,
   }) async {
     try {
-      final response = await http.post(
-        Uri.parse('$_baseUrl/auth/login'),
-        headers: await _headers,
-        body: jsonEncode({
-          'email': email,
-          'password': password,
-        }),
-      ).timeout(Duration(seconds: _timeoutSeconds));
+      print('🔐 Attempting login to: $_baseUrl/api/auth/login'); // Debug log
+      print('📧 Email: $email'); // Debug log
+
+      final response = await http
+          .post(
+            Uri.parse('$_baseUrl/api/auth/login'),
+            headers: await _headers,
+            body: jsonEncode({
+              'email': email,
+              'password': password,
+            }),
+          )
+          .timeout(Duration(seconds: _timeoutSeconds));
+
+      print('📥 Login response status: ${response.statusCode}'); // Debug log
+      print('📄 Login response body: ${response.body}'); // Debug log
 
       final result = _handleResponse(response);
-      
+
       // Store token if login is successful
       if (result['success'] && result['token'] != null) {
         final prefs = await SharedPreferences.getInstance();
@@ -100,24 +124,85 @@ class ApiService extends GetxService {
 
       return result;
     } catch (e) {
+      print('❌ Login error: $e'); // Debug log
+      if (e is SocketException) {
+        return {
+          'success': false,
+          'message':
+              'Could not connect to server. Please check your internet connection.',
+          'error': e.toString()
+        };
+      } else if (e is TimeoutException) {
+        return {
+          'success': false,
+          'message': 'Server is taking too long to respond. Please try again.',
+          'error': e.toString()
+        };
+      }
       return _handleError(e);
     }
   }
 
-  // Logout method
+  // Logout
   Future<Map<String, dynamic>> logout() async {
     try {
-      final response = await http.post(
-        Uri.parse('$_baseUrl/api/auth/logout'),
-        headers: await _headers,
-      ).timeout(Duration(seconds: _timeoutSeconds));
-
+      print('Attempting logout'); // Debug log
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('auth_token');
-
-      return _handleResponse(response);
+      return {'success': true, 'message': 'Logged out successfully'};
     } catch (e) {
+      print('Logout error: $e');
       return _handleError(e);
+    }
+  }
+
+  // Check Authentication Status
+  Future<bool> isAuthenticated() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
+      return token != null;
+    } catch (e) {
+      print('Auth check error: $e');
+      return false;
+    }
+  }
+
+  // Server Health Check
+  Future<Map<String, dynamic>> checkServerHealth() async {
+    try {
+      print('🔍 Checking server health at: $_baseUrl/health'); // Debug log
+
+      final response = await http
+          .get(
+            Uri.parse('$_baseUrl/health'),
+            headers: await _headers,
+          )
+          .timeout(Duration(seconds: 5));
+
+      print(
+          '🏥 Health check response: ${response.statusCode} - ${response.body}'); // Debug log
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'message': 'Server is healthy',
+          'status': response.statusCode
+        };
+      } else {
+        return {
+          'success': false,
+          'message': 'Server is not responding properly',
+          'status': response.statusCode
+        };
+      }
+    } catch (e) {
+      print('❌ Health check error: $e'); // Debug log
+      return {
+        'success': false,
+        'message': 'Could not connect to server',
+        'error': e.toString()
+      };
     }
   }
 
@@ -126,103 +211,26 @@ class ApiService extends GetxService {
     required String email,
   }) async {
     try {
-      final response = await http.post(
-        Uri.parse('$_baseUrl/api/auth/reset-password'),
-        headers: await _headers,
-        body: jsonEncode({
-          'email': email,
-        }),
-      ).timeout(Duration(seconds: _timeoutSeconds));
+      print('Attempting password reset for: $email'); // Debug log
+
+      final response = await http
+          .post(
+            Uri.parse('$_baseUrl/api/auth/forgot-password'),
+            headers: await _headers,
+            body: jsonEncode({
+              'email': email,
+            }),
+          )
+          .timeout(Duration(seconds: _timeoutSeconds));
+
+      print(
+          'Reset password response status: ${response.statusCode}'); // Debug log
+      print('Reset password response body: ${response.body}'); // Debug log
 
       return _handleResponse(response);
     } catch (e) {
+      print('Reset password error: $e'); // Debug log
       return _handleError(e);
     }
-  }
-
-  // Book-related methods
-  Future<Map<String, dynamic>> fetchBooks() async {
-    try {
-      final response = await http.get(
-        Uri.parse('$_baseUrl/api/books'),
-        headers: await _headers,
-      ).timeout(Duration(seconds: _timeoutSeconds));
-
-      return _handleResponse(response);
-    } catch (e) {
-      return _handleError(e);
-    }
-  }
-
-  // Enhanced Error Handling Method
-  Map<String, dynamic> _handleResponse(http.Response response) {
-    try {
-      final responseBody = jsonDecode(response.body);
-      switch (response.statusCode) {
-        case 200:
-        case 201:
-          return {
-            'success': true,
-            'data': responseBody,
-            'token': responseBody['token'],
-            'message': responseBody['message'] ?? 'Success'
-          };
-        case 400:
-          return {
-            'success': false,
-            'error': 'Bad Request',
-            'message': responseBody['message'] ?? 'Invalid request',
-            'details': responseBody
-          };
-        case 401:
-          return {
-            'success': false,
-            'error': 'Unauthorized',
-            'message': responseBody['message'] ?? 'Authentication failed',
-            'action': 'logout'
-          };
-        case 403:
-          return {
-            'success': false,
-            'error': 'Forbidden',
-            'message': responseBody['message'] ?? 'Access denied',
-          };
-        case 404:
-          return {
-            'success': false,
-            'error': 'Not Found',
-            'message': responseBody['message'] ?? 'Resource not found',
-          };
-        case 500:
-          return {
-            'success': false,
-            'error': 'Server Error',
-            'message': responseBody['message'] ?? 'Internal server error',
-          };
-        default:
-          return {
-            'success': false,
-            'error': 'Unknown Error',
-            'message': 'An unexpected error occurred',
-            'code': response.statusCode
-          };
-      }
-    } catch (e) {
-      return {
-        'success': false,
-        'error': 'Parse Error',
-        'message': 'Could not parse server response',
-        'details': e.toString()
-      };
-    }
-  }
-
-  // Handle errors
-  Map<String, dynamic> _handleError(dynamic e) {
-    return {
-      'success': false,
-      'error': 'Network Error',
-      'message': e.toString()
-    };
   }
 }
