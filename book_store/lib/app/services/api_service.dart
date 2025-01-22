@@ -80,60 +80,57 @@ class ApiService extends GetxService {
     };
   }
 
+  Future<Map<String, dynamic>> _makeRequest(
+    String method,
+    String endpoint,
+    Map<String, dynamic> body, {
+    int retryCount = 0,
+  }) async {
+    try {
+      print('🔄 Making $method request to $endpoint (Attempt ${retryCount + 1}/${AppConfig.maxRetries})');
+      
+      final headers = await _headers;
+      final uri = Uri.parse('$_baseUrl$endpoint');
+      
+      http.Response response;
+      switch (method.toUpperCase()) {
+        case 'POST':
+          response = await http
+              .post(uri, headers: headers, body: jsonEncode(body))
+              .timeout(Duration(seconds: AppConfig.connectionTimeout));
+          break;
+        default:
+          throw UnsupportedError('Unsupported HTTP method: $method');
+      }
+
+      final result = _handleResponse(response);
+      return result;
+    } catch (e) {
+      if (e is TimeoutException || e is SocketException) {
+        if (retryCount < AppConfig.maxRetries - 1) {
+          print('⚠️ Request failed, retrying in ${AppConfig.retryDelay} seconds...');
+          await Future.delayed(Duration(seconds: AppConfig.retryDelay));
+          return _makeRequest(method, endpoint, body, retryCount: retryCount + 1);
+        }
+      }
+      return _handleError(e);
+    }
+  }
+
   // User Registration
   Future<Map<String, dynamic>> register({
     required String name,
     required String email,
     required String password,
   }) async {
-    try {
-      print('📝 Starting registration process:');
-      print('🌐 Base URL: $_baseUrl');
-      print('📍 Endpoint: $_baseUrl${AppConfig.registerEndpoint}');
-      print('👤 Username: $name');
-      print('📧 Email: $email');
-      
-      final headers = await _headers;
-      print('📤 Request Headers: $headers');
-      
-      final requestBody = {
-        'username': name,
-        'email': email,
-        'password': password,
-        'role': 'user'
-      };
-      print('📦 Request Body: ${jsonEncode(requestBody)}');
-
-      final response = await http
-          .post(
-            Uri.parse('$_baseUrl${AppConfig.registerEndpoint}'),
-            headers: headers,
-            body: jsonEncode(requestBody),
-          )
-          .timeout(const Duration(seconds: AppConfig.connectionTimeout));
-
-      print('📥 Response Status Code: ${response.statusCode}');
-      print('📥 Response Headers: ${response.headers}');
-      print('📥 Response Body: ${response.body}');
-
-      final result = _handleResponse(response);
-      print('🔄 Processed Result: $result');
-
-      return result;
-    } on SocketException catch (e) {
-      print('❌ Socket Exception during registration: $e');
-      print('🔍 Error Details: ${e.message}');
-      print('🔌 Address: ${e.address}');
-      print('🔌 Port: ${e.port}');
-      return _handleError(e);
-    } on TimeoutException catch (e) {
-      print('⏰ Timeout Exception during registration: $e');
-      return _handleError(e);
-    } catch (e) {
-      print('❌ General Error during registration: $e');
-      print('🔍 Error Type: ${e.runtimeType}');
-      return _handleError(e);
-    }
+    print('📝 Starting registration process:');
+    final requestBody = {
+      'username': name,
+      'email': email,
+      'password': password,
+      'role': 'user'
+    };
+    return _makeRequest('POST', AppConfig.registerEndpoint, requestBody);
   }
 
   // Login user
@@ -141,47 +138,20 @@ class ApiService extends GetxService {
     required String email,
     required String password,
   }) async {
-    try {
-      print('🔐 Attempting Login:');
-      print('🌐 Base URL: $_baseUrl');
-      print('📍 Endpoint: $_baseUrl${AppConfig.loginEndpoint}');
-      print('📧 Email: $email');
-      
-      final headers = await _headers;
-      print('📤 Request Headers: $headers');
-      
-      final requestBody = {
-        'email': email,
-        'password': password,
-      };
-      print('📦 Request Body: ${jsonEncode(requestBody)}');
-
-      final response = await http
-          .post(
-            Uri.parse('$_baseUrl${AppConfig.loginEndpoint}'),
-            headers: headers,
-            body: jsonEncode(requestBody),
-          )
-          .timeout(const Duration(seconds: AppConfig.connectionTimeout));
-
-      print('📥 Response Status Code: ${response.statusCode}');
-      print('📥 Response Headers: ${response.headers}');
-      print('📥 Response Body: ${response.body}');
-
-      final result = _handleResponse(response);
-      print('🔄 Processed Result: $result');
-
-      if (result['success'] == true && result['token'] != null) {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('auth_token', result['token']);
-        print('✅ Token stored successfully');
-      }
-
-      return result;
-    } catch (e) {
-      print('❌ Error during login: $e');
-      return _handleError(e);
+    print('🔐 Attempting Login:');
+    final requestBody = {
+      'email': email,
+      'password': password,
+    };
+    final result = await _makeRequest('POST', AppConfig.loginEndpoint, requestBody);
+    
+    if (result['success'] == true && result['token'] != null) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('auth_token', result['token']);
+      print('✅ Token stored successfully');
     }
+    
+    return result;
   }
 
   // Verify OTP

@@ -40,7 +40,7 @@ class MyApp extends StatelessWidget {
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: ThemeMode.light,
-      initialRoute: AppPages.initial,
+      initialRoute: AppRoutes.splash,
       getPages: AppPages.routes,
       defaultTransition: Transition.fade,
       transitionDuration: const Duration(milliseconds: 200),

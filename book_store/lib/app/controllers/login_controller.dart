@@ -4,8 +4,8 @@ import '../services/api_service.dart';
 import '../routes/app_pages.dart';
 
 class LoginController extends GetxController {
-  late final TextEditingController emailController;
-  late final TextEditingController passwordController;
+  TextEditingController? _emailController;
+  TextEditingController? _passwordController;
   final ApiService _apiService = ApiService.to;
   
   final RxBool isLoading = false.obs;
@@ -17,6 +17,11 @@ class LoginController extends GetxController {
   final RxString token = ''.obs;
   final RxBool isAuthenticated = false.obs;
   final RxMap userData = {}.obs;
+
+  void setControllers(TextEditingController email, TextEditingController password) {
+    _emailController = email;
+    _passwordController = password;
+  }
 
   void validateEmail(String value) {
     if (value.isEmpty) {
@@ -48,6 +53,8 @@ class LoginController extends GetxController {
   }
 
   Future<void> login() async {
+    if (_emailController == null || _passwordController == null) return;
+    
     try {
       if (isLoading.value) return;
       
@@ -55,7 +62,7 @@ class LoginController extends GetxController {
       errorMessage.value = '';
       
       // Basic validation
-      if (emailController.text.isEmpty || !GetUtils.isEmail(emailController.text)) {
+      if (_emailController!.text.isEmpty || !GetUtils.isEmail(_emailController!.text)) {
         errorMessage.value = 'Please enter a valid email address';
         Get.snackbar(
           'Invalid Email',
@@ -68,7 +75,7 @@ class LoginController extends GetxController {
         return;
       }
       
-      if (passwordController.text.isEmpty || passwordController.text.length < 6) {
+      if (_passwordController!.text.isEmpty || _passwordController!.text.length < 6) {
         errorMessage.value = 'Password must be at least 6 characters';
         Get.snackbar(
           'Invalid Password',
@@ -82,8 +89,8 @@ class LoginController extends GetxController {
       }
       
       final response = await _apiService.login(
-        email: emailController.text,
-        password: passwordController.text,
+        email: _emailController!.text,
+        password: _passwordController!.text,
       );
       
       if (response['success'] == true) {
@@ -102,66 +109,29 @@ class LoginController extends GetxController {
             snackPosition: SnackPosition.BOTTOM,
             backgroundColor: Colors.green[100],
             colorText: Colors.green[900],
-            duration: const Duration(seconds: 2),
           );
           
-          // Navigate to home after short delay
-          await Future.delayed(const Duration(seconds: 1));
           Get.offAllNamed(AppRoutes.home);
         }
       } else {
-        String errorMessage = '';
-        switch (response['error']) {
-          case 'EMAIL_NOT_VERIFIED':
-            errorMessage = response['message'] ?? 'Please verify your email before logging in';
-            Get.snackbar(
-              'Email Not Verified',
-              errorMessage,
-              snackPosition: SnackPosition.BOTTOM,
-              backgroundColor: Colors.orange[100],
-              colorText: Colors.orange[900],
-              duration: const Duration(seconds: 5),
-              mainButton: TextButton(
-                onPressed: () => Get.toNamed(
-                  AppRoutes.verifyOtp,
-                  arguments: {'email': emailController.text},
-                ),
-                child: const Text('Verify Now'),
-              ),
-            );
-            break;
-          case 'INVALID_CREDENTIALS':
-            errorMessage = 'Invalid email or password';
-            Get.snackbar(
-              'Login Failed',
-              errorMessage,
-              snackPosition: SnackPosition.BOTTOM,
-              backgroundColor: Colors.red[100],
-              colorText: Colors.red[900],
-              duration: const Duration(seconds: 3),
-            );
-            break;
-          default:
-            errorMessage = response['message'] ?? 'Login failed. Please try again.';
-            Get.snackbar(
-              'Login Failed',
-              errorMessage,
-              snackPosition: SnackPosition.BOTTOM,
-              backgroundColor: Colors.red[100],
-              colorText: Colors.red[900],
-              duration: const Duration(seconds: 3),
-            );
-        }
+        errorMessage.value = response['message'] ?? 'Login failed';
+        Get.snackbar(
+          'Error',
+          errorMessage.value,
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.red[100],
+          colorText: Colors.red[900],
+        );
       }
     } catch (e) {
-      print('Login Error: $e');
+      hasConnectionError.value = true;
+      errorMessage.value = 'Connection error. Please check your internet connection.';
       Get.snackbar(
         'Error',
-        'Failed to login. Please try again.',
+        errorMessage.value,
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: Colors.red[100],
         colorText: Colors.red[900],
-        duration: const Duration(seconds: 3),
       );
     } finally {
       isLoading.value = false;
@@ -169,16 +139,9 @@ class LoginController extends GetxController {
   }
 
   @override
-  void onInit() {
-    super.onInit();
-    emailController = TextEditingController();
-    passwordController = TextEditingController();
-  }
-
-  @override
   void onClose() {
-    emailController.dispose();
-    passwordController.dispose();
+    _emailController = null;
+    _passwordController = null;
     super.onClose();
   }
 }

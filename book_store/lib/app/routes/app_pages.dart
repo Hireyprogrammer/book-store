@@ -30,8 +30,8 @@ class AppRoutes {
 class AppPages {
   AppPages._();
 
-  static const initial = AppRoutes.login;
-
+  // Remove the initial route definition since it's now set in main.dart
+  
   static final routes = [
     GetPage(
       name: AppRoutes.splash,

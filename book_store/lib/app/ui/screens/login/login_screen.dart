@@ -3,11 +3,39 @@ import 'package:get/get.dart';
 import '../../../controllers/login_controller.dart';
 import '../../../routes/app_pages.dart';
 
-class LoginScreen extends GetView<LoginController> {
+class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
 
   @override
+  State<LoginScreen> createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends State<LoginScreen> {
+  late final TextEditingController _emailController;
+  late final TextEditingController _passwordController;
+  late final LoginController _loginController;
+
+  @override
+  void initState() {
+    super.initState();
+    _emailController = TextEditingController();
+    _passwordController = TextEditingController();
+    _loginController = Get.find<LoginController>();
+    _loginController.setControllers(_emailController, _passwordController);
+  }
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    // Ensure controller is initialized
+    final LoginController controller = Get.find<LoginController>();
+    
     return Scaffold(
       backgroundColor: const Color(0xFF2196F3),
       body: SafeArea(
@@ -76,8 +104,8 @@ class LoginScreen extends GetView<LoginController> {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      Obx(() => TextField(
-                        controller: controller.emailController,
+                      TextField(
+                        controller: _emailController,
                         keyboardType: TextInputType.emailAddress,
                         style: const TextStyle(
                           fontSize: 16,
@@ -86,7 +114,7 @@ class LoginScreen extends GetView<LoginController> {
                         decoration: InputDecoration(
                           hintText: 'Enter your email',
                           prefixIcon: const Icon(Icons.email_outlined, color: Color(0xFF1565C0)),
-                          errorText: controller.emailError.value.isEmpty ? null : controller.emailError.value,
+                          errorText: _loginController.emailError.value.isEmpty ? null : _loginController.emailError.value,
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
@@ -109,8 +137,8 @@ class LoginScreen extends GetView<LoginController> {
                           filled: true,
                           fillColor: Colors.grey[50],
                         ),
-                        onChanged: (value) => controller.validateEmail(value),
-                      )),
+                        onChanged: (value) => _loginController.validateEmail(value),
+                      ),
                       const SizedBox(height: 20),
                       
                       // Password Field
@@ -124,8 +152,8 @@ class LoginScreen extends GetView<LoginController> {
                       ),
                       const SizedBox(height: 8),
                       Obx(() => TextField(
-                        controller: controller.passwordController,
-                        obscureText: !controller.isPasswordVisible.value,
+                        controller: _passwordController,
+                        obscureText: !_loginController.isPasswordVisible.value,
                         style: const TextStyle(
                           fontSize: 16,
                           color: Color(0xFF2C3E50),
@@ -135,14 +163,14 @@ class LoginScreen extends GetView<LoginController> {
                           prefixIcon: const Icon(Icons.lock_outline, color: Color(0xFF1565C0)),
                           suffixIcon: IconButton(
                             icon: Icon(
-                              controller.isPasswordVisible.value
+                              _loginController.isPasswordVisible.value
                                   ? Icons.visibility_off
                                   : Icons.visibility,
                               color: const Color(0xFF1565C0),
                             ),
-                            onPressed: controller.togglePasswordVisibility,
+                            onPressed: _loginController.togglePasswordVisibility,
                           ),
-                          errorText: controller.passwordError.value.isEmpty ? null : controller.passwordError.value,
+                          errorText: _loginController.passwordError.value.isEmpty ? null : _loginController.passwordError.value,
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
@@ -165,7 +193,7 @@ class LoginScreen extends GetView<LoginController> {
                           filled: true,
                           fillColor: Colors.grey[50],
                         ),
-                        onChanged: (value) => controller.validatePassword(value),
+                        onChanged: (value) => _loginController.validatePassword(value),
                       )),
                       
                       // Forgot Password Link
@@ -186,7 +214,7 @@ class LoginScreen extends GetView<LoginController> {
                       
                       // Connection Error Message
                       Obx(() {
-                        if (controller.hasConnectionError.value) {
+                        if (_loginController.hasConnectionError.value) {
                           return Container(
                             margin: const EdgeInsets.only(bottom: 16),
                             padding: const EdgeInsets.all(12),
@@ -214,7 +242,7 @@ class LoginScreen extends GetView<LoginController> {
                                 ),
                                 IconButton(
                                   icon: const Icon(Icons.refresh, color: Colors.orange),
-                                  onPressed: controller.retryConnection,
+                                  onPressed: _loginController.retryConnection,
                                 ),
                               ],
                             ),
@@ -229,7 +257,7 @@ class LoginScreen extends GetView<LoginController> {
                         width: double.infinity,
                         height: 50,
                         child: ElevatedButton(
-                          onPressed: controller.isLoading.value ? null : controller.login,
+                          onPressed: _loginController.isLoading.value ? null : _loginController.login,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF2196F3),
                             shape: RoundedRectangleBorder(
@@ -237,7 +265,7 @@ class LoginScreen extends GetView<LoginController> {
                             ),
                             elevation: 2,
                           ),
-                          child: controller.isLoading.value
+                          child: _loginController.isLoading.value
                               ? const SizedBox(
                                   height: 20,
                                   width: 20,
@@ -262,10 +290,10 @@ class LoginScreen extends GetView<LoginController> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Text(
-                            "Don't have an account?",
+                          const Text(
+                            "Don't have an account? ",
                             style: TextStyle(
-                              color: Colors.grey[600],
+                              color: Colors.grey,
                               fontSize: 14,
                             ),
                           ),

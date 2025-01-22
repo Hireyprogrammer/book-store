@@ -10,9 +10,11 @@ class AppConfig {
   static const String resendVerificationEndpoint = '/api/auth/resend-verification';
   
   // Timeout Configurations
-  static const int connectionTimeout = 30; // seconds
-  static const int receiveTimeout = 30; // seconds
-
+  static const int connectionTimeout = 15; // Reduced from 30 to 15 seconds
+  static const int receiveTimeout = 15; // Reduced from 30 to 15 seconds
+  static const int maxRetries = 3; // Maximum number of retry attempts
+  static const int retryDelay = 1; // Delay between retries in seconds
+  
   // Environment Modes
   static const String developmentMode = 'development';
   static const String productionMode = 'production';
@@ -38,16 +40,22 @@ class AppConfig {
 // Custom Exceptions for Network Handling
 class ServerConnectionException implements Exception {
   final String message;
-  ServerConnectionException(this.message);
+  final int? statusCode;
+  final String? details;
+
+  ServerConnectionException(this.message, {this.statusCode, this.details});
 
   @override
-  String toString() => 'ServerConnectionException: $message';
+  String toString() => 'ServerConnectionException: $message${statusCode != null ? ' (Status: $statusCode)' : ''}${details != null ? '\nDetails: $details' : ''}';
 }
 
 class NetworkException implements Exception {
   final String message;
-  NetworkException(this.message);
+  final String? errorCode;
+  final dynamic data;
+
+  NetworkException(this.message, {this.errorCode, this.data});
 
   @override
-  String toString() => 'NetworkException: $message';
+  String toString() => 'NetworkException: $message${errorCode != null ? ' (Code: $errorCode)' : ''}';
 }

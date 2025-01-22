@@ -9,26 +9,29 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
+class _SplashScreenState extends State<SplashScreen>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _fadeAnimation;
 
   @override
   void initState() {
     super.initState();
-    
+
     // Setup animation
     _controller = AnimationController(
       duration: const Duration(milliseconds: 1500),
       vsync: this,
     );
-    
+
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(_controller);
     _controller.forward();
 
     // Navigate to login after delay
     Future.delayed(const Duration(seconds: 3), () {
-      Get.offAllNamed(AppRoutes.login);
+      if (mounted) {
+        Get.offAllNamed(AppRoutes.login);
+      }
     });
   }
 
@@ -75,7 +78,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                 ],
               ),
               const SizedBox(height: 30),
-              
+
               // App Name
               const Text(
                 'E-BOOK',
@@ -87,7 +90,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                 ),
               ),
               const SizedBox(height: 10),
-              
+
               // Tagline
               const Text(
                 'Your Digital Library',
